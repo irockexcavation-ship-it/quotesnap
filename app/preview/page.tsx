@@ -94,7 +94,13 @@ export default function PreviewPage() {
     }
 
     const finalBytes = await mergedPdf.save();
-    const blob = new Blob([finalBytes], { type: "application/pdf" });
+
+    const finalBuffer = finalBytes.buffer.slice(
+      finalBytes.byteOffset,
+      finalBytes.byteOffset + finalBytes.byteLength
+    ) as ArrayBuffer;
+
+    const blob = new Blob([finalBuffer], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
@@ -152,31 +158,19 @@ export default function PreviewPage() {
           flexWrap: "wrap",
         }}
       >
-        <button
-          onClick={exportPDF}
-          style={topButton("#1c1917", "#ffffff")}
-        >
+        <button onClick={exportPDF} style={topButton("#1c1917", "#ffffff")}>
           Export Quote + COI PDF
         </button>
 
-        <button
-          onClick={sendQuoteText}
-          style={topButton("#15803d", "#ffffff")}
-        >
+        <button onClick={sendQuoteText} style={topButton("#15803d", "#ffffff")}>
           Send Quote Text
         </button>
 
-        <button
-          onClick={handleEdit}
-          style={topButton("#e7e5e4", "#1c1917")}
-        >
+        <button onClick={handleEdit} style={topButton("#e7e5e4", "#1c1917")}>
           Edit Quote
         </button>
 
-        <button
-          onClick={handleDuplicate}
-          style={topButton("#2563eb", "#ffffff")}
-        >
+        <button onClick={handleDuplicate} style={topButton("#2563eb", "#ffffff")}>
           Duplicate Quote
         </button>
       </div>
