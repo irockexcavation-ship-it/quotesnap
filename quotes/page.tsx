@@ -11,7 +11,7 @@ export default function QuotesPage() {
       localStorage.getItem("quotesnapSavedQuotes") || "[]"
     );
 
-    setQuotes(stored.reverse());
+    setQuotes([...stored].reverse());
   }, []);
 
   function openQuote(quote: any) {
@@ -24,7 +24,7 @@ export default function QuotesPage() {
   }
 
   const filtered = quotes.filter((q) =>
-    `${q.clientName} ${q.quoteNumber}`
+    `${q.clientName || ""} ${q.quoteNumber || ""}`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
@@ -34,7 +34,7 @@ export default function QuotesPage() {
       style={{
         minHeight: "100vh",
         background: "#f5f5f4",
-        padding: "30px",
+        padding: "30px 20px",
         fontFamily: "Arial, sans-serif",
       }}
     >
@@ -57,6 +57,7 @@ export default function QuotesPage() {
           style={{
             fontSize: "34px",
             marginBottom: "20px",
+            color: "#1c1917",
           }}
         >
           Quotes
@@ -73,6 +74,7 @@ export default function QuotesPage() {
             border: "1px solid #d6d3d1",
             marginBottom: "20px",
             fontSize: "16px",
+            boxSizing: "border-box",
           }}
         />
 
@@ -84,42 +86,43 @@ export default function QuotesPage() {
             border: "1px solid #e7e5e4",
           }}
         >
-          {filtered.length === 0 && (
+          {filtered.length === 0 ? (
             <div style={{ padding: "20px", color: "#78716c" }}>
               No quotes found.
             </div>
+          ) : (
+            filtered.map((quote, i) => (
+              <div
+                key={quote.id || i}
+                onClick={() => openQuote(quote)}
+                style={{
+                  padding: "16px",
+                  borderBottom: "1px solid #f0f0f0",
+                  cursor: "pointer",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    fontSize: "18px",
+                    marginBottom: "4px",
+                    color: "#1c1917",
+                  }}
+                >
+                  {quote.clientName || "Unnamed Client"}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "14px",
+                    color: "#57534e",
+                  }}
+                >
+                  {quote.quoteNumber || "No Quote #"} • {quote.quoteDate || "No Date"} • {quote.projectTotal || "$0"}
+                </div>
+              </div>
+            ))
           )}
-
-          {filtered.map((quote, i) => (
-            <div
-              key={i}
-              onClick={() => openQuote(quote)}
-              style={{
-                padding: "16px",
-                borderBottom: "1px solid #f0f0f0",
-                cursor: "pointer",
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: "bold",
-                  fontSize: "18px",
-                  marginBottom: "4px",
-                }}
-              >
-                {quote.clientName || "Unnamed Client"}
-              </div>
-
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#57534e",
-                }}
-              >
-                {quote.quoteNumber} • {quote.quoteDate} • {quote.projectTotal}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </main>
