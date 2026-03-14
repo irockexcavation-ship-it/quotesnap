@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { PDFDocument } from "pdf-lib";
 import irockLogo from "../irock-logo.png";
 
@@ -39,212 +38,149 @@ export default function PreviewPage() {
   }
 
   async function exportPDF() {
-
-  const pdf = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  const margin = 20;
-  let y = 30;
-
-  pdf.setFont("Helvetica", "bold");
-  pdf.setFontSize(22);
-  pdf.text("iRock Excavation & Hauling", margin, y);
-
-  y += 8;
-
-  pdf.setFontSize(12);
-  pdf.setFont("Helvetica", "normal");
-  pdf.text("Rock Solid Driveway Systems", margin, y);
-
-  y += 10;
-
-  pdf.text("(502) 552-9462", margin, y);
-  y += 6;
-  pdf.text("irockexcavation@gmail.com", margin, y);
-  y += 6;
-  pdf.text("iRockX.com", margin, y);
-
-  y += 15;
-
-  pdf.setFont("Helvetica", "bold");
-  pdf.setFontSize(14);
-  pdf.text("PROJECT QUOTE", margin, y);
-
-  y += 10;
-
-  pdf.setFont("Helvetica", "normal");
-  pdf.setFontSize(12);
-
-  pdf.text(`Quote #: ${quote.quoteNumber}`, margin, y);
-  y += 7;
-
-  pdf.text(`Client: ${quote.clientName}`, margin, y);
-  y += 7;
-
-  pdf.text(`Address: ${quote.projectAddress}`, margin, y);
-  y += 7;
-
-  pdf.text(`Contact: ${quote.contactInfo}`, margin, y);
-  y += 7;
-
-  pdf.text(`Date: ${quote.quoteDate}`, margin, y);
-
-  y += 15;
-
-  pdf.setFont("Helvetica", "bold");
-  pdf.setFontSize(16);
-  pdf.text("PROJECT TOTAL", margin, y);
-
-  y += 10;
-
-  pdf.setFontSize(26);
-  pdf.text(`${quote.projectTotal}`, margin, y);
-
-  y += 20;
-
-  pdf.setFont("Helvetica", "bold");
-  pdf.setFontSize(14);
-  pdf.text("Estimated Start Window", margin, y);
-
-  y += 8;
-
-  pdf.setFont("Helvetica", "normal");
-  pdf.setFontSize(12);
-
-  const startLines = pdf.splitTextToSize(
-    quote.startWindow,
-    170
-  );
-
-  pdf.text(startLines, margin, y);
-
-  y += startLines.length * 6 + 10;
-
-  pdf.setFont("Helvetica", "bold");
-  pdf.text("Scope of Work", margin, y);
-
-  y += 8;
-
-  pdf.setFont("Helvetica", "normal");
-
-  const scopeLines = pdf.splitTextToSize(
-    quote.scopeOfWork,
-    170
-  );
-
-  pdf.text(scopeLines, margin, y);
-
-  y += scopeLines.length * 6 + 10;
-
-  pdf.setFont("Helvetica", "bold");
-  pdf.text("Next Steps", margin, y);
-
-  y += 8;
-
-  pdf.setFont("Helvetica", "normal");
-
-  const nextSteps =
-    "To move forward with this project, reply to this quote or contact iRock Excavation directly. Once approved, your project will be placed on the schedule.";
-
-  const nextLines = pdf.splitTextToSize(nextSteps, 170);
-
-  pdf.text(nextLines, margin, y);
-
-  const quoteBytes = pdf.output("arraybuffer");
-
-  const mergedPdf = await PDFDocument.create();
-
-  const quoteDoc = await PDFDocument.load(quoteBytes);
-
-  const quotePages = await mergedPdf.copyPages(
-    quoteDoc,
-    quoteDoc.getPageIndices()
-  );
-
-  quotePages.forEach((page) => mergedPdf.addPage(page));
-
-  try {
-
-    const coiResponse = await fetch("/coi.pdf");
-
-    if (coiResponse.ok) {
-
-      const coiBytes = await coiResponse.arrayBuffer();
-
-      const coiDoc = await PDFDocument.load(coiBytes);
-
-      const coiPages = await mergedPdf.copyPages(
-        coiDoc,
-        coiDoc.getPageIndices()
-      );
-
-      coiPages.forEach((page) => mergedPdf.addPage(page));
-
-    }
-
-  } catch (error) {
-
-    alert("COI could not be attached. The quote will still export.");
-
-  }
-
-  const finalBytes = await mergedPdf.save();
-
-  const blob = new Blob([finalBytes], {
-    type: "application/pdf",
-  });
-
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-
-  link.href = url;
-
-  link.download = buildFileName();
-
-  document.body.appendChild(link);
-
-  link.click();
-
-  document.body.removeChild(link);
-
-}
-
-    const imgData = canvas.toDataURL("image/png");
-
-    const quotePdf = new jsPDF({
+    const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
     });
 
-    const pageWidth = quotePdf.internal.pageSize.getWidth();
-    const pageHeight = quotePdf.internal.pageSize.getHeight();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 18;
+    const contentWidth = pageWidth - margin * 2;
+    const lineHeight = 6.5;
 
-    const margin = 10;
-    const usableWidth = pageWidth - margin * 2;
-    const usableHeight = pageHeight - margin * 2;
+    let y = 20;
 
-    const imgWidth = usableWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    let heightLeft = imgHeight;
-    let position = margin;
-
-    quotePdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-    heightLeft -= usableHeight;
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight + margin;
-      quotePdf.addPage();
-      quotePdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-      heightLeft -= usableHeight;
+    function ensureSpace(heightNeeded: number) {
+      if (y + heightNeeded > pageHeight - margin) {
+        pdf.addPage();
+        y = 20;
+      }
     }
 
-    const quotePdfBytes = quotePdf.output("arraybuffer");
+    function addWrappedText(
+      text: string,
+      x: number,
+      maxWidth: number,
+      options?: { fontSize?: number; style?: "normal" | "bold" }
+    ) {
+      if (options?.fontSize) pdf.setFontSize(options.fontSize);
+      pdf.setFont("helvetica", options?.style || "normal");
+
+      const lines = pdf.splitTextToSize(text || "", maxWidth);
+      ensureSpace(lines.length * lineHeight);
+      pdf.text(lines, x, y);
+      y += lines.length * lineHeight;
+    }
+
+    pdf.setFillColor(245, 245, 244);
+    pdf.roundedRect(margin, y, contentWidth, 34, 4, 4, "F");
+
+    try {
+      pdf.addImage(irockLogo.src, "PNG", margin + 4, y + 4, 26, 18);
+    } catch {}
+
+    pdf.setTextColor(28, 25, 23);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text(COMPANY_NAME, margin + 34, y + 10);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.setTextColor(87, 83, 78);
+    pdf.text(COMPANY_TAGLINE, margin + 34, y + 17);
+
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(120, 113, 108);
+    pdf.text(COMPANY_PHONE, margin + 34, y + 23);
+    pdf.text(COMPANY_EMAIL, margin + 34, y + 28);
+    pdf.text(COMPANY_WEBSITE, margin + 34, y + 33);
+
+    y += 44;
+
+    pdf.setTextColor(28, 25, 23);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("PROJECT QUOTE", margin, y);
+    y += 8;
+
+    pdf.setDrawColor(231, 229, 228);
+    pdf.roundedRect(margin, y, contentWidth, 34, 4, 4, "S");
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("Quote #:", margin + 6, y + 8);
+    pdf.text("Client:", margin + 6, y + 16);
+    pdf.text("Address:", margin + 6, y + 24);
+    pdf.text("Date:", margin + 6, y + 32);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.text(String(quote.quoteNumber || "Pending"), margin + 28, y + 8);
+    pdf.text(String(quote.clientName || "-"), margin + 28, y + 16);
+    pdf.text(String(quote.projectAddress || "-"), margin + 28, y + 24);
+    pdf.text(String(quote.quoteDate || "-"), margin + 28, y + 32);
+
+    const rightX = margin + contentWidth / 2 + 4;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Contact:", rightX, y + 8);
+
+    pdf.setFont("helvetica", "normal");
+    const contactLines = pdf.splitTextToSize(String(quote.contactInfo || "-"), 55);
+    pdf.text(contactLines, rightX + 18, y + 8);
+
+    y += 44;
+
+    pdf.setFillColor(250, 250, 249);
+    pdf.setDrawColor(214, 211, 209);
+    pdf.roundedRect(margin, y, contentWidth, 26, 4, 4, "FD");
+
+    pdf.setTextColor(102, 102, 102);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text("PROJECT TOTAL", margin + 6, y + 8);
+
+    pdf.setTextColor(28, 25, 23);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(24);
+    pdf.text(String(quote.projectTotal || "$0"), margin + 6, y + 20);
+
+    y += 36;
+
+    function addSection(title: string, body: string) {
+      ensureSpace(20);
+      pdf.setDrawColor(231, 229, 228);
+      pdf.roundedRect(margin, y, contentWidth, 12, 3, 3, "S");
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(28, 25, 23);
+      pdf.text(title, margin + 6, y + 8);
+
+      y += 18;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.setTextColor(41, 37, 36);
+
+      const lines = pdf.splitTextToSize(body || "-", contentWidth);
+      for (const line of lines) {
+        ensureSpace(lineHeight);
+        pdf.text(line, margin, y);
+        y += lineHeight;
+      }
+
+      y += 8;
+    }
+
+    addSection("Estimated Start Window", String(quote.startWindow || "-"));
+    addSection("Scope of Work", String(quote.scopeOfWork || "-"));
+    addSection(
+      "Next Steps",
+      "To move forward with this project, reply to this quote or contact iRock Excavation directly. Once approved, your project will be placed on the schedule. A current Certificate of Insurance is attached at the end of this PDF for your records."
+    );
+
+    const quotePdfBytes = pdf.output("arraybuffer");
 
     const mergedPdf = await PDFDocument.create();
 
@@ -267,7 +203,7 @@ export default function PreviewPage() {
         );
         coiPages.forEach((page) => mergedPdf.addPage(page));
       }
-    } catch (error) {
+    } catch {
       alert("COI could not be attached. The quote will still export.");
     }
 
