@@ -11,7 +11,7 @@ export default function QuotesPage() {
       localStorage.getItem("quotesnapSavedQuotes") || "[]"
     );
 
-    setQuotes(stored);
+    setQuotes(stored.reverse());
   }, []);
 
   function openQuote(quote: any) {
@@ -90,9 +90,9 @@ export default function QuotesPage() {
             </div>
           )}
 
-          {filtered.map((quote) => (
+          {filtered.map((quote, i) => (
             <div
-              key={quote.id}
+              key={i}
               onClick={() => openQuote(quote)}
               style={{
                 padding: "16px",
