@@ -169,7 +169,7 @@ export default function PreviewPage() {
     >
       <div
         style={{
-          maxWidth: "850px",
+          maxWidth: "900px",
           margin: "0 auto 20px auto",
           display: "flex",
           gap: "10px",
@@ -200,54 +200,65 @@ export default function PreviewPage() {
       <div
         id="quote-card"
         style={{
-          maxWidth: "850px",
+          maxWidth: "900px",
           margin: "0 auto",
           background: "#ffffff",
-          borderRadius: "12px",
+          borderRadius: "16px",
           overflow: "hidden",
-          boxShadow: "0 3px 12px rgba(0,0,0,.15)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          border: "1px solid #e7e5e4",
         }}
       >
-        {quote.bannerImage && (
+        {quote.bannerImage ? (
           <img
             src={quote.bannerImage}
             alt="Project banner"
             style={{
               width: "100%",
-              height: "240px",
+              height: "260px",
               objectFit: "cover",
               display: "block",
             }}
           />
+        ) : (
+          <div
+            style={{
+              height: "120px",
+              background: "linear-gradient(135deg, #e7e5e4, #f5f5f4)",
+            }}
+          />
         )}
 
-        <div style={{ padding: "30px" }}>
+        <div style={{ padding: "34px 32px 36px" }}>
           <div
             style={{
               display: "flex",
               alignItems: "flex-start",
               justifyContent: "space-between",
-              gap: "20px",
+              gap: "24px",
               flexWrap: "wrap",
-              marginBottom: "24px",
+              marginBottom: "28px",
+              paddingBottom: "24px",
+              borderBottom: "1px solid #e7e5e4",
             }}
           >
-            <div style={{ flex: "1 1 320px" }}>
+            <div style={{ flex: "1 1 360px" }}>
               <img
                 src={irockLogo.src}
                 alt="iRock Logo"
                 style={{
-                  height: "60px",
-                  marginBottom: "10px",
+                  height: "68px",
+                  marginBottom: "12px",
                   display: "block",
                 }}
               />
 
               <h1
                 style={{
-                  fontSize: "28px",
+                  fontSize: "30px",
                   margin: "0 0 6px 0",
                   color: "#1c1917",
+                  lineHeight: 1.1,
                 }}
               >
                 {COMPANY_NAME}
@@ -257,7 +268,8 @@ export default function PreviewPage() {
                 style={{
                   color: "#57534e",
                   fontSize: "16px",
-                  marginBottom: "8px",
+                  fontWeight: 600,
+                  marginBottom: "10px",
                 }}
               >
                 {COMPANY_TAGLINE}
@@ -267,7 +279,7 @@ export default function PreviewPage() {
                 style={{
                   color: "#78716c",
                   fontSize: "14px",
-                  lineHeight: 1.65,
+                  lineHeight: 1.75,
                 }}
               >
                 {COMPANY_PHONE}
@@ -280,17 +292,17 @@ export default function PreviewPage() {
 
             <div
               style={{
-                textAlign: "right",
-                minWidth: "220px",
-                flex: "0 1 260px",
+                flex: "0 1 280px",
+                minWidth: "240px",
               }}
             >
               <div
                 style={{
-                  fontSize: "14px",
-                  color: "#666",
-                  marginBottom: "8px",
-                  letterSpacing: "0.08em",
+                  fontSize: "13px",
+                  color: "#78716c",
+                  marginBottom: "10px",
+                  letterSpacing: "0.12em",
+                  fontWeight: 700,
                 }}
               >
                 PROJECT QUOTE
@@ -298,45 +310,38 @@ export default function PreviewPage() {
 
               <div
                 style={{
-                  fontSize: "15px",
-                  lineHeight: 1.8,
-                  color: "#292524",
+                  background: "#fafaf9",
+                  border: "1px solid #e7e5e4",
+                  borderRadius: "12px",
+                  padding: "16px 18px",
                 }}
               >
-                <div>
-                  <strong>Quote #:</strong> {quote.quoteNumber || "Pending"}
-                </div>
-                <div>
-                  <strong>Client:</strong> {quote.clientName}
-                </div>
-                <div>
-                  <strong>Address:</strong> {quote.projectAddress}
-                </div>
-                <div>
-                  <strong>Contact:</strong> {quote.contactInfo}
-                </div>
-                <div>
-                  <strong>Date:</strong> {quote.quoteDate}
-                </div>
+                <InfoRow label="Quote #" value={quote.quoteNumber || "Pending"} />
+                <InfoRow label="Client" value={quote.clientName} />
+                <InfoRow label="Address" value={quote.projectAddress} />
+                <InfoRow label="Contact" value={quote.contactInfo} />
+                <InfoRow label="Date" value={quote.quoteDate} />
               </div>
             </div>
           </div>
 
           <div
             style={{
-              border: "1px solid #ddd",
-              padding: "25px",
-              borderRadius: "10px",
               marginBottom: "30px",
+              padding: "28px 24px",
+              borderRadius: "14px",
+              background: "linear-gradient(180deg, #fafaf9 0%, #f5f5f4 100%)",
+              border: "1px solid #d6d3d1",
               textAlign: "center",
-              background: "#fafaf9",
             }}
           >
             <div
               style={{
-                fontSize: "14px",
+                fontSize: "13px",
                 color: "#666",
-                letterSpacing: "0.08em",
+                letterSpacing: "0.12em",
+                fontWeight: 700,
+                marginBottom: "10px",
               }}
             >
               PROJECT TOTAL
@@ -344,40 +349,102 @@ export default function PreviewPage() {
 
             <div
               style={{
-                fontSize: "42px",
-                fontWeight: "bold",
-                marginTop: "6px",
+                fontSize: "50px",
+                fontWeight: 800,
                 color: "#1c1917",
+                lineHeight: 1,
               }}
             >
               {quote.projectTotal}
             </div>
           </div>
 
-          <section style={{ marginBottom: "24px" }}>
-            <h2 style={sectionHeading}>Estimated Start Window</h2>
+          <SectionCard title="Estimated Start Window">
             <p style={bodyText}>{quote.startWindow}</p>
-          </section>
+          </SectionCard>
 
-          <section style={{ marginBottom: "24px" }}>
-            <h2 style={sectionHeading}>Scope of Work</h2>
+          <SectionCard title="Scope of Work">
             <p style={{ ...bodyText, whiteSpace: "pre-line" }}>
               {quote.scopeOfWork}
             </p>
-          </section>
+          </SectionCard>
 
-          <section>
-            <h2 style={sectionHeading}>Next Steps</h2>
+          <SectionCard title="Next Steps">
             <p style={bodyText}>
               To move forward with this project, reply to this quote or contact
               iRock Excavation directly. Once approved, your project will be
               placed on the schedule. A current Certificate of Insurance is
               attached at the end of this PDF for your records.
             </p>
-          </section>
+          </SectionCard>
         </div>
       </div>
     </main>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "78px 1fr",
+        gap: "10px",
+        alignItems: "start",
+        marginBottom: "8px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "14px",
+          fontWeight: 700,
+          color: "#44403c",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "14px",
+          color: "#292524",
+          wordBreak: "break-word",
+        }}
+      >
+        {value || "-"}
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      style={{
+        marginBottom: "22px",
+        padding: "22px 22px 20px",
+        borderRadius: "14px",
+        background: "#ffffff",
+        border: "1px solid #e7e5e4",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+      }}
+    >
+      <h2
+        style={{
+          margin: "0 0 10px 0",
+          color: "#1c1917",
+          fontSize: "22px",
+        }}
+      >
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }
 
@@ -394,13 +461,9 @@ function topButton(background: string, color: string) {
   };
 }
 
-const sectionHeading = {
-  marginBottom: "8px",
-  color: "#1c1917",
-};
-
 const bodyText = {
-  lineHeight: 1.8,
+  lineHeight: 1.85,
   color: "#292524",
   margin: 0,
+  fontSize: "16px",
 };
