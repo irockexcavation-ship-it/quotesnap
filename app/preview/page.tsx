@@ -39,15 +39,179 @@ export default function PreviewPage() {
   }
 
   async function exportPDF() {
-    const element = document.getElementById("quote-card");
-    if (!element) return;
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      scrollY: -window.scrollY,
-    });
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const margin = 20;
+  let y = 30;
+
+  pdf.setFont("Helvetica", "bold");
+  pdf.setFontSize(22);
+  pdf.text("iRock Excavation & Hauling", margin, y);
+
+  y += 8;
+
+  pdf.setFontSize(12);
+  pdf.setFont("Helvetica", "normal");
+  pdf.text("Rock Solid Driveway Systems", margin, y);
+
+  y += 10;
+
+  pdf.text("(502) 552-9462", margin, y);
+  y += 6;
+  pdf.text("irockexcavation@gmail.com", margin, y);
+  y += 6;
+  pdf.text("iRockX.com", margin, y);
+
+  y += 15;
+
+  pdf.setFont("Helvetica", "bold");
+  pdf.setFontSize(14);
+  pdf.text("PROJECT QUOTE", margin, y);
+
+  y += 10;
+
+  pdf.setFont("Helvetica", "normal");
+  pdf.setFontSize(12);
+
+  pdf.text(`Quote #: ${quote.quoteNumber}`, margin, y);
+  y += 7;
+
+  pdf.text(`Client: ${quote.clientName}`, margin, y);
+  y += 7;
+
+  pdf.text(`Address: ${quote.projectAddress}`, margin, y);
+  y += 7;
+
+  pdf.text(`Contact: ${quote.contactInfo}`, margin, y);
+  y += 7;
+
+  pdf.text(`Date: ${quote.quoteDate}`, margin, y);
+
+  y += 15;
+
+  pdf.setFont("Helvetica", "bold");
+  pdf.setFontSize(16);
+  pdf.text("PROJECT TOTAL", margin, y);
+
+  y += 10;
+
+  pdf.setFontSize(26);
+  pdf.text(`${quote.projectTotal}`, margin, y);
+
+  y += 20;
+
+  pdf.setFont("Helvetica", "bold");
+  pdf.setFontSize(14);
+  pdf.text("Estimated Start Window", margin, y);
+
+  y += 8;
+
+  pdf.setFont("Helvetica", "normal");
+  pdf.setFontSize(12);
+
+  const startLines = pdf.splitTextToSize(
+    quote.startWindow,
+    170
+  );
+
+  pdf.text(startLines, margin, y);
+
+  y += startLines.length * 6 + 10;
+
+  pdf.setFont("Helvetica", "bold");
+  pdf.text("Scope of Work", margin, y);
+
+  y += 8;
+
+  pdf.setFont("Helvetica", "normal");
+
+  const scopeLines = pdf.splitTextToSize(
+    quote.scopeOfWork,
+    170
+  );
+
+  pdf.text(scopeLines, margin, y);
+
+  y += scopeLines.length * 6 + 10;
+
+  pdf.setFont("Helvetica", "bold");
+  pdf.text("Next Steps", margin, y);
+
+  y += 8;
+
+  pdf.setFont("Helvetica", "normal");
+
+  const nextSteps =
+    "To move forward with this project, reply to this quote or contact iRock Excavation directly. Once approved, your project will be placed on the schedule.";
+
+  const nextLines = pdf.splitTextToSize(nextSteps, 170);
+
+  pdf.text(nextLines, margin, y);
+
+  const quoteBytes = pdf.output("arraybuffer");
+
+  const mergedPdf = await PDFDocument.create();
+
+  const quoteDoc = await PDFDocument.load(quoteBytes);
+
+  const quotePages = await mergedPdf.copyPages(
+    quoteDoc,
+    quoteDoc.getPageIndices()
+  );
+
+  quotePages.forEach((page) => mergedPdf.addPage(page));
+
+  try {
+
+    const coiResponse = await fetch("/coi.pdf");
+
+    if (coiResponse.ok) {
+
+      const coiBytes = await coiResponse.arrayBuffer();
+
+      const coiDoc = await PDFDocument.load(coiBytes);
+
+      const coiPages = await mergedPdf.copyPages(
+        coiDoc,
+        coiDoc.getPageIndices()
+      );
+
+      coiPages.forEach((page) => mergedPdf.addPage(page));
+
+    }
+
+  } catch (error) {
+
+    alert("COI could not be attached. The quote will still export.");
+
+  }
+
+  const finalBytes = await mergedPdf.save();
+
+  const blob = new Blob([finalBytes], {
+    type: "application/pdf",
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+
+  link.href = url;
+
+  link.download = buildFileName();
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  document.body.removeChild(link);
+
+}
 
     const imgData = canvas.toDataURL("image/png");
 
@@ -181,7 +345,7 @@ export default function PreviewPage() {
         </button>
 
         <button onClick={exportPDF} style={topButton("#1c1917", "#ffffff")}>
-          Export Quote + COI PDF
+          Export to PDF
         </button>
 
         <button onClick={sendQuoteText} style={topButton("#15803d", "#ffffff")}>
