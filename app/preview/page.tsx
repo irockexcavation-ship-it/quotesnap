@@ -37,6 +37,62 @@ export default function PreviewPage() {
     return `${quoteNum}-${client}.pdf`;
   }
 
+  function splitOverviewAndScope(fullText: string) {
+    if (!fullText) {
+      return {
+        overview: "",
+        scope: "",
+      };
+    }
+
+    const lines = fullText
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter((line: string) => line !== "");
+
+    if (lines.length <= 2) {
+      return {
+        overview: fullText,
+        scope: "",
+      };
+    }
+
+    const overviewLines: string[] = [];
+    const scopeLines: string[] = [];
+
+    let foundScopeStart = false;
+
+    for (const line of lines) {
+      const looksLikeScopeLine =
+        line.startsWith("•") ||
+        /^[-*]\s/.test(line) ||
+        /^[A-Z][A-Za-z\s&/]+:$/.test(line) ||
+        /^[A-Z][A-Za-z\s&/]+$/.test(line);
+
+      if (!foundScopeStart && looksLikeScopeLine) {
+        foundScopeStart = true;
+      }
+
+      if (foundScopeStart) {
+        scopeLines.push(line);
+      } else {
+        overviewLines.push(line);
+      }
+    }
+
+    if (scopeLines.length === 0) {
+      return {
+        overview: fullText,
+        scope: "",
+      };
+    }
+
+    return {
+      overview: overviewLines.join("\n"),
+      scope: scopeLines.join("\n"),
+    };
+  }
+
   async function exportPDF() {
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -50,6 +106,8 @@ export default function PreviewPage() {
     const contentWidth = pageWidth - margin * 2;
     const lineHeight = 6.5;
 
+    const { overview, scope } = splitOverviewAndScope(String(quote.scopeOfWork || ""));
+
     let y = 20;
 
     function ensureSpace(heightNeeded: number) {
@@ -59,19 +117,28 @@ export default function PreviewPage() {
       }
     }
 
-    function addWrappedText(
-      text: string,
-      x: number,
-      maxWidth: number,
-      options?: { fontSize?: number; style?: "normal" | "bold" }
-    ) {
-      if (options?.fontSize) pdf.setFontSize(options.fontSize);
-      pdf.setFont("helvetica", options?.style || "normal");
+    function addParagraphBlock(text: string) {
+      const lines = pdf.splitTextToSize(text || "-", contentWidth);
+      for (const line of lines) {
+        ensureSpace(lineHeight);
+        pdf.text(line, margin, y);
+        y += lineHeight;
+      }
+      y += 8;
+    }
 
-      const lines = pdf.splitTextToSize(text || "", maxWidth);
-      ensureSpace(lines.length * lineHeight);
-      pdf.text(lines, x, y);
-      y += lines.length * lineHeight;
+    // Add project photo if it exists
+    if (quote.bannerImage) {
+      try {
+        const imgWidth = contentWidth;
+        const imgHeight = 70;
+
+        ensureSpace(imgHeight);
+        pdf.addImage(quote.bannerImage, "JPEG", margin, y, imgWidth, imgHeight);
+        y += imgHeight + 10;
+      } catch (error) {
+        console.warn("Image could not be added to PDF.");
+      }
     }
 
     pdf.setFillColor(245, 245, 244);
@@ -87,7 +154,7 @@ export default function PreviewPage() {
     pdf.text(COMPANY_NAME, margin + 34, y + 10);
 
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(11);
+    pdf.setFontSize(12);
     pdf.setTextColor(87, 83, 78);
     pdf.text(COMPANY_TAGLINE, margin + 34, y + 17);
 
@@ -138,7 +205,7 @@ export default function PreviewPage() {
     pdf.setTextColor(102, 102, 102);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(9);
-    pdf.text("PROJECT TOTAL", margin + 6, y + 8);
+    pdf.text("TOTAL PROJECT COST", margin + 6, y + 8);
 
     pdf.setTextColor(28, 25, 23);
     pdf.setFont("helvetica", "bold");
@@ -148,6 +215,8 @@ export default function PreviewPage() {
     y += 36;
 
     function addSection(title: string, body: string) {
+      if (!body || !body.trim()) return;
+
       ensureSpace(20);
       pdf.setDrawColor(231, 229, 228);
       pdf.roundedRect(margin, y, contentWidth, 12, 3, 3, "S");
@@ -163,18 +232,13 @@ export default function PreviewPage() {
       pdf.setFontSize(11);
       pdf.setTextColor(41, 37, 36);
 
-      const lines = pdf.splitTextToSize(body || "-", contentWidth);
-      for (const line of lines) {
-        ensureSpace(lineHeight);
-        pdf.text(line, margin, y);
-        y += lineHeight;
-      }
-
-      y += 8;
+      addParagraphBlock(body);
     }
 
     addSection("Estimated Start Window", String(quote.startWindow || "-"));
-    addSection("Scope of Work", String(quote.scopeOfWork || "-"));
+    addSection("Project Overview", overview || String(quote.scopeOfWork || "-"));
+    addSection("Scope of Work", scope);
+
     addSection(
       "Next Steps",
       "To move forward with this project, reply to this quote or contact iRock Excavation directly. Once approved, your project will be placed on the schedule. A current Certificate of Insurance is attached at the end of this PDF for your records."
@@ -257,6 +321,8 @@ export default function PreviewPage() {
   function goHome() {
     window.location.href = "/";
   }
+
+  const { overview, scope } = splitOverviewAndScope(String(quote.scopeOfWork || ""));
 
   return (
     <main
@@ -444,7 +510,7 @@ export default function PreviewPage() {
                 marginBottom: "10px",
               }}
             >
-              PROJECT TOTAL
+              TOTAL PROJECT COST
             </div>
 
             <div
@@ -463,11 +529,17 @@ export default function PreviewPage() {
             <p style={bodyText}>{quote.startWindow}</p>
           </SectionCard>
 
-          <SectionCard title="Scope of Work">
+          <SectionCard title="Project Overview">
             <p style={{ ...bodyText, whiteSpace: "pre-line" }}>
-              {quote.scopeOfWork}
+              {overview || quote.scopeOfWork}
             </p>
           </SectionCard>
+
+          {scope ? (
+            <SectionCard title="Scope of Work">
+              <p style={{ ...bodyText, whiteSpace: "pre-line" }}>{scope}</p>
+            </SectionCard>
+          ) : null}
 
           <SectionCard title="Next Steps">
             <p style={bodyText}>
