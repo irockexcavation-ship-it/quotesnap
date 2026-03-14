@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type SavedClient = {
+  name: string;
+  address: string;
+  contact: string;
+};
+
 export default function NewQuotePage() {
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
@@ -12,6 +18,7 @@ export default function NewQuotePage() {
   const [startWindow, setStartWindow] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
   const [bannerImage, setBannerImage] = useState("");
+  const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
 
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
@@ -37,7 +44,32 @@ export default function NewQuotePage() {
       setQuoteDate(getTodayDate());
       setQuoteNumber(generateQuoteNumber());
     }
+
+    loadSavedClients();
   }, []);
+
+  function loadSavedClients() {
+    const quotes = JSON.parse(
+      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+    );
+
+    const clientMap = new Map<string, SavedClient>();
+
+    for (const quote of quotes) {
+      const name = String(quote.clientName || "").trim();
+      if (!name) continue;
+
+      if (!clientMap.has(name.toLowerCase())) {
+        clientMap.set(name.toLowerCase(), {
+          name,
+          address: String(quote.projectAddress || ""),
+          contact: String(quote.contactInfo || ""),
+        });
+      }
+    }
+
+    setSavedClients(Array.from(clientMap.values()));
+  }
 
   function getTodayDate() {
     const today = new Date();
@@ -122,9 +154,7 @@ export default function NewQuotePage() {
     } catch (error) {
       alert("That image could not be processed.");
     } finally {
-      if (event.target) {
-        event.target.value = "";
-      }
+      event.target.value = "";
     }
   }
 
@@ -145,6 +175,37 @@ export default function NewQuotePage() {
   function handleProjectTotalChange(value: string) {
     const formatted = formatCurrencyInput(value);
     setProjectTotal(formatted);
+  }
+
+  function applyClientAutofill(nameValue: string) {
+    const match = savedClients.find(
+      (client) => client.name.toLowerCase() === nameValue.trim().toLowerCase()
+    );
+
+    if (!match) return;
+
+    setClientName(match.name);
+    setProjectAddress(match.address || "");
+    setContactInfo(match.contact || "");
+  }
+
+  function handleClientNameChange(value: string) {
+    setClientName(value);
+
+    const exactMatch = savedClients.find(
+      (client) => client.name.toLowerCase() === value.trim().toLowerCase()
+    );
+
+    if (exactMatch) {
+      setProjectAddress(exactMatch.address || "");
+      setContactInfo(exactMatch.contact || "");
+    }
+  }
+
+  function selectSavedClient(client: SavedClient) {
+    setClientName(client.name);
+    setProjectAddress(client.address || "");
+    setContactInfo(client.contact || "");
   }
 
   function handlePreview() {
@@ -200,6 +261,8 @@ export default function NewQuotePage() {
     window.location.href = "/";
   }
 
+  const recentClients = savedClients.slice(0, 6);
+
   return (
     <main
       style={{
@@ -237,6 +300,7 @@ export default function NewQuotePage() {
             fontSize: "36px",
             fontWeight: "bold",
             marginBottom: "10px",
+            color: "#1c1917",
           }}
         >
           New Quote
@@ -245,19 +309,20 @@ export default function NewQuotePage() {
         <p
           style={{
             fontSize: "18px",
-            color: "#555",
+            color: "#57534e",
             marginBottom: "30px",
           }}
         >
-          Enter the project details below to start building a quote.
+          Enter the project details below to build a quote.
         </p>
 
         <div
           style={{
             background: "white",
             padding: "24px",
-            borderRadius: "12px",
+            borderRadius: "14px",
             boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+            border: "1px solid #e7e5e4",
           }}
         >
           <div
@@ -267,15 +332,7 @@ export default function NewQuotePage() {
             }}
           >
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Banner Photo
-              </label>
+              <label style={labelStyle}>Banner Photo</label>
 
               <input
                 ref={cameraInputRef}
@@ -339,10 +396,10 @@ export default function NewQuotePage() {
             <div
               style={{
                 padding: "12px 14px",
-                background: "#fafaf9",
-                border: "1px solid #e7e5e4",
+                background: "#fff7ed",
+                border: "1px solid #fdba74",
                 borderRadius: "10px",
-                color: "#44403c",
+                color: "#9a3412",
                 fontSize: "14px",
               }}
             >
@@ -350,15 +407,7 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Quote Number
-              </label>
+              <label style={labelStyle}>Quote Number</label>
               <input
                 type="text"
                 value={quoteNumber}
@@ -372,34 +421,67 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Client Name
-              </label>
+              <label style={labelStyle}>Client Name</label>
               <input
                 type="text"
                 placeholder="John Smith"
                 value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
+                onChange={(e) => handleClientNameChange(e.target.value)}
+                onBlur={(e) => applyClientAutofill(e.target.value)}
                 style={inputStyle}
+                list="saved-clients"
               />
+              <datalist id="saved-clients">
+                {savedClients.map((client) => (
+                  <option key={client.name} value={client.name} />
+                ))}
+              </datalist>
+
+              {recentClients.length > 0 && (
+                <div style={{ marginTop: "10px" }}>
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "#78716c",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    Recent Clients
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {recentClients.map((client) => (
+                      <button
+                        key={client.name}
+                        type="button"
+                        onClick={() => selectSavedClient(client)}
+                        style={{
+                          padding: "7px 10px",
+                          borderRadius: "999px",
+                          border: "1px solid #fdba74",
+                          background: "#fff7ed",
+                          color: "#9a3412",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {client.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Project Address
-              </label>
+              <label style={labelStyle}>Project Address</label>
               <input
                 type="text"
                 placeholder="123 Gravel Rd, New Castle, KY"
@@ -410,15 +492,7 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Phone / Email
-              </label>
+              <label style={labelStyle}>Phone / Email</label>
               <input
                 type="text"
                 placeholder="(555) 555-5555 / john@email.com"
@@ -429,15 +503,7 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Date
-              </label>
+              <label style={labelStyle}>Date</label>
               <input
                 type="date"
                 value={quoteDate}
@@ -447,15 +513,7 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Project Total
-              </label>
+              <label style={labelStyle}>Project Total</label>
               <input
                 type="text"
                 placeholder="$4,800"
@@ -466,15 +524,7 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Estimated Start Window
-              </label>
+              <label style={labelStyle}>Estimated Start Window</label>
               <input
                 type="text"
                 placeholder="2–3 weeks after approval"
@@ -485,15 +535,7 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: "bold",
-                }}
-              >
-                Scope of Work
-              </label>
+              <label style={labelStyle}>Scope of Work</label>
               <textarea
                 placeholder="• Power rake existing gravel driveway surface&#10;• Add and spread 20 tons of DGA&#10;• Compact with vibratory roller"
                 rows={8}
@@ -507,7 +549,7 @@ export default function NewQuotePage() {
               type="button"
               onClick={handlePreview}
               style={{
-                background: "#1c1917",
+                background: "#f97316",
                 color: "white",
                 border: "none",
                 borderRadius: "10px",
@@ -538,6 +580,13 @@ function topButton(background: string, color: string) {
     fontWeight: "bold" as const,
   };
 }
+
+const labelStyle = {
+  display: "block",
+  marginBottom: "6px",
+  fontWeight: "bold",
+  color: "#1c1917",
+};
 
 const inputStyle = {
   width: "100%",
