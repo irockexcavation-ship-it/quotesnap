@@ -37,6 +37,12 @@ export default function PreviewPage() {
     return `${quoteNum}-${client}.pdf`;
   }
 
+  function buildPhotoFileName() {
+    const quoteNum = quote.quoteNumber || "quote";
+    const client = quote.clientName ? slugify(quote.clientName) : "site-photo";
+    return `${quoteNum}-${client}-photo.jpg`;
+  }
+
   function splitOverviewAndScope(fullText: string) {
     if (!fullText) {
       return {
@@ -127,7 +133,6 @@ export default function PreviewPage() {
       y += 8;
     }
 
-    // Add project photo if it exists
     if (quote.bannerImage) {
       try {
         const imgWidth = contentWidth;
@@ -291,6 +296,20 @@ export default function PreviewPage() {
     URL.revokeObjectURL(url);
   }
 
+  function savePhotoToDevice() {
+    if (!quote.bannerImage) {
+      alert("No photo is attached to this quote.");
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = quote.bannerImage;
+    link.download = buildPhotoFileName();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   function handleEdit() {
     localStorage.setItem("quotesnapEditDraft", JSON.stringify(quote));
     window.location.href = "/new-quote";
@@ -348,6 +367,10 @@ export default function PreviewPage() {
 
         <button onClick={exportPDF} style={topButton("#1c1917", "#ffffff")}>
           Export to PDF
+        </button>
+
+        <button onClick={savePhotoToDevice} style={topButton("#57534e", "#ffffff")}>
+          Save Photo to Device
         </button>
 
         <button onClick={sendQuoteText} style={topButton("#15803d", "#ffffff")}>
