@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function NewQuotePage() {
   const [clientName, setClientName] = useState("");
@@ -12,6 +12,9 @@ export default function NewQuotePage() {
   const [startWindow, setStartWindow] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
   const [bannerImage, setBannerImage] = useState("");
+
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const editData = localStorage.getItem("quotesnapEditDraft");
@@ -118,6 +121,10 @@ export default function NewQuotePage() {
       setBannerImage(compressedImage);
     } catch (error) {
       alert("That image could not be processed.");
+    } finally {
+      if (event.target) {
+        event.target.value = "";
+      }
     }
   }
 
@@ -176,7 +183,7 @@ export default function NewQuotePage() {
       projectTotal: quoteData.projectTotal,
       startWindow: quoteData.startWindow,
       scopeOfWork: quoteData.scopeOfWork,
-      bannerImage: "",
+      bannerImage: quoteData.bannerImage,
     };
 
     const updatedQuotes = [quoteSummary, ...existingQuotes];
@@ -187,6 +194,10 @@ export default function NewQuotePage() {
     );
 
     window.location.href = "/preview";
+  }
+
+  function goHome() {
+    window.location.href = "/";
   }
 
   return (
@@ -201,9 +212,26 @@ export default function NewQuotePage() {
         style={{
           maxWidth: "900px",
           margin: "0 auto",
-          padding: "40px 20px",
+          padding: "24px 20px 40px",
         }}
       >
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap",
+            marginBottom: "18px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={goHome}
+            style={topButton("#e7e5e4", "#1c1917")}
+          >
+            Home
+          </button>
+        </div>
+
         <h1
           style={{
             fontSize: "36px",
@@ -239,16 +267,58 @@ export default function NewQuotePage() {
             }}
           >
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Banner Photo
               </label>
+
               <input
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
                 onChange={handleImageUpload}
-                style={inputStyle}
+                style={{ display: "none" }}
               />
+
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: "none" }}
+              />
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  marginBottom: "12px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  style={topButton("#1c1917", "#ffffff")}
+                >
+                  Take Job Photo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  style={topButton("#57534e", "#ffffff")}
+                >
+                  Choose Existing Photo
+                </button>
+              </div>
+
               {bannerImage && (
                 <div style={{ marginTop: "12px" }}>
                   <img
@@ -280,7 +350,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Quote Number
               </label>
               <input
@@ -296,7 +372,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Client Name
               </label>
               <input
@@ -309,7 +391,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Project Address
               </label>
               <input
@@ -322,7 +410,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Phone / Email
               </label>
               <input
@@ -335,7 +429,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Date
               </label>
               <input
@@ -347,7 +447,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Project Total
               </label>
               <input
@@ -360,7 +466,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Estimated Start Window
               </label>
               <input
@@ -373,7 +485,13 @@ export default function NewQuotePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: "bold" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: "bold",
+                }}
+              >
                 Scope of Work
               </label>
               <textarea
@@ -406,6 +524,19 @@ export default function NewQuotePage() {
       </div>
     </main>
   );
+}
+
+function topButton(background: string, color: string) {
+  return {
+    padding: "12px 18px",
+    fontSize: "15px",
+    borderRadius: "8px",
+    border: "none",
+    background,
+    color,
+    cursor: "pointer",
+    fontWeight: "bold" as const,
+  };
 }
 
 const inputStyle = {

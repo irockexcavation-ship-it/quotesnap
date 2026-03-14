@@ -24,6 +24,20 @@ export default function PreviewPage() {
     return <div style={{ padding: "40px" }}>Loading...</div>;
   }
 
+  function slugify(value: string) {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function buildFileName() {
+    const quoteNum = quote.quoteNumber || "iRock-Quote";
+    const client = quote.clientName ? slugify(quote.clientName) : "client";
+    return `${quoteNum}-${client}.pdf`;
+  }
+
   async function exportPDF() {
     const element = document.getElementById("quote-card");
     if (!element) return;
@@ -105,7 +119,7 @@ export default function PreviewPage() {
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${quote.quoteNumber || "iRock-Quote"}-with-COI.pdf`;
+    link.download = buildFileName();
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -140,6 +154,10 @@ export default function PreviewPage() {
     window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
   }
 
+  function goHome() {
+    window.location.href = "/";
+  }
+
   return (
     <main
       style={{
@@ -158,6 +176,10 @@ export default function PreviewPage() {
           flexWrap: "wrap",
         }}
       >
+        <button onClick={goHome} style={topButton("#e7e5e4", "#1c1917")}>
+          Home
+        </button>
+
         <button onClick={exportPDF} style={topButton("#1c1917", "#ffffff")}>
           Export Quote + COI PDF
         </button>
@@ -166,7 +188,7 @@ export default function PreviewPage() {
           Send Quote Text
         </button>
 
-        <button onClick={handleEdit} style={topButton("#e7e5e4", "#1c1917")}>
+        <button onClick={handleEdit} style={topButton("#d6d3d1", "#1c1917")}>
           Edit Quote
         </button>
 
