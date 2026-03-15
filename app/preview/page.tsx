@@ -32,15 +32,15 @@ export default function PreviewPage() {
   }
 
   function buildFileName() {
-    const quoteNum = quote.quoteNumber || "iRock-Quote";
+    const quoteNum = quote.quoteNumber || "IR-no-number";
     const client = quote.clientName ? slugify(quote.clientName) : "client";
-    return `${quoteNum}-${client}.pdf`;
+    return `${client}_${quoteNum}_quote.pdf`;
   }
 
   function buildPhotoFileName() {
-    const quoteNum = quote.quoteNumber || "quote";
+    const quoteNum = quote.quoteNumber || "IR-no-number";
     const client = quote.clientName ? slugify(quote.clientName) : "site-photo";
-    return `${quoteNum}-${client}-photo.jpg`;
+    return `${client}_${quoteNum}_photo.jpg`;
   }
 
   function splitOverviewAndScope(fullText: string) {
@@ -320,6 +320,7 @@ export default function PreviewPage() {
       ...quote,
       id: Date.now().toString(),
       quoteNumber: "",
+      status: "Draft",
     };
 
     localStorage.setItem("quotesnapEditDraft", JSON.stringify(duplicate));
