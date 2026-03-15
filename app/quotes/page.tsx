@@ -23,6 +23,23 @@ export default function QuotesPage() {
     window.location.href = "/";
   }
 
+  function deleteQuote(quoteToDelete: any) {
+    const confirmed = window.confirm(
+      `Delete quote for ${quoteToDelete.clientName || "this client"}?`
+    );
+
+    if (!confirmed) return;
+
+    const stored = JSON.parse(
+      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+    );
+
+    const updated = stored.filter((q: any) => q.id !== quoteToDelete.id);
+
+    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updated));
+    setQuotes([...updated].reverse());
+  }
+
   const filtered = quotes.filter((q) =>
     `${q.clientName || ""} ${q.quoteNumber || ""}`
       .toLowerCase()
@@ -94,40 +111,68 @@ export default function QuotesPage() {
             filtered.map((quote, i) => (
               <div
                 key={quote.id || i}
-                onClick={() => openQuote(quote)}
                 style={{
                   padding: "18px",
                   borderBottom: "1px solid #f0f0f0",
-                  cursor: "pointer",
-                  transition: "background 0.15s",
+                  background: "white",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#fff7ed")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "white")
-                }
               >
                 <div
                   style={{
-                    fontWeight: "bold",
-                    fontSize: "18px",
-                    marginBottom: "6px",
-                    color: "#1c1917",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "12px",
                   }}
                 >
-                  {quote.clientName || "Unnamed Client"}
-                </div>
+                  <div
+                    onClick={() => openQuote(quote)}
+                    style={{
+                      flex: 1,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        fontSize: "18px",
+                        marginBottom: "6px",
+                        color: "#1c1917",
+                      }}
+                    >
+                      {quote.clientName || "Unnamed Client"}
+                    </div>
 
-                <div
-                  style={{
-                    fontSize: "14px",
-                    color: "#57534e",
-                  }}
-                >
-                  {quote.quoteNumber || "No Quote #"} •{" "}
-                  {quote.quoteDate || "No Date"} •{" "}
-                  {quote.projectTotal || "$0"}
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        color: "#57534e",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {quote.quoteNumber || "No Quote #"} •{" "}
+                      {quote.quoteDate || "No Date"} •{" "}
+                      {quote.projectTotal || "$0"}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteQuote(quote)}
+                    style={{
+                      background: "#dc2626",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      fontSize: "14px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))
