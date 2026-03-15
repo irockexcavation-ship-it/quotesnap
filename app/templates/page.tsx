@@ -2,61 +2,49 @@
 
 const templates = [
   {
-    id: "driveway-refresh",
-    name: "Driveway Refresh",
-    startWindow: "2–3 weeks after approval",
-    scopeOfWork: `• Power rake existing gravel driveway surface
-• Re-establish driveway grade and remove minor ruts
-• Add and spread fresh DGA surface layer as needed
-• Compact surface using vibratory roller
-• Leave driveway with a clean finished appearance`,
+    title: "Driveway Refresh",
+    description: "Best for worn gravel drives that need reshaping and fresh surface stone.",
+    scope:
+      "• Power rake existing gravel driveway surface\n• Re-establish driveway grade and remove minor ruts",
   },
   {
-    id: "culvert-install",
-    name: "Culvert Install",
-    startWindow: "2–4 weeks after approval",
-    scopeOfWork: `• Excavate driveway crossing for culvert installation
-• Install properly sized culvert pipe
-• Backfill and compact around pipe
-• Restore driveway surface with fresh stone
-• Leave work area clean and passable`,
+    title: "Culvert Installation",
+    description: "For driveway crossings that need a new culvert or replacement pipe.",
+    scope:
+      "• Excavate driveway crossing for culvert installation\n• Install properly sized culvert pipe",
   },
   {
-    id: "shed-pad",
-    name: "Shed Pad",
-    startWindow: "1–2 weeks after approval",
-    scopeOfWork: `• Strip and prepare pad area
-• Establish proper grade for structure placement
-• Install and compact stone base
-• Fine grade for clean finished appearance`,
+    title: "Pad Prep",
+    description: "Good starting point for sheds, garages, containers, or small structures.",
+    scope:
+      "• Strip and prepare pad area\n• Establish proper grade for structure placement",
   },
   {
-    id: "drainage-repair",
-    name: "Drainage Repair",
-    startWindow: "2–3 weeks after approval",
-    scopeOfWork: `• Excavate affected drainage area
-• Correct water flow issues where possible
-• Install stone and/or drainage improvements as needed
-• Restore disturbed areas to a clean finished condition`,
+    title: "Drainage Repair",
+    description: "Use when water flow is causing washout, soft spots, or drainage trouble.",
+    scope:
+      "• Excavate affected drainage area\n• Correct water flow issues where possible",
   },
 ];
 
 export default function TemplatesPage() {
-  function useTemplate(template: (typeof templates)[number]) {
-    localStorage.setItem(
-      "quotesnapEditDraft",
-      JSON.stringify({
-        clientName: "",
-        projectAddress: "",
-        contactInfo: "",
-        quoteDate: "",
-        projectTotal: "",
-        startWindow: template.startWindow,
-        scopeOfWork: template.scopeOfWork,
-        bannerImage: "",
-      })
+  function goHome() {
+    window.location.href = "/";
+  }
+
+  function startFromTemplate(scope: string) {
+    const existingDraft = JSON.parse(
+      localStorage.getItem("quotesnapEditDraft") ||
+        localStorage.getItem("quotesnapDraft") ||
+        "{}"
     );
 
+    const updatedDraft = {
+      ...existingDraft,
+      scopeOfWork: scope,
+    };
+
+    localStorage.setItem("quotesnapEditDraft", JSON.stringify(updatedDraft));
     window.location.href = "/new-quote";
   }
 
@@ -65,21 +53,32 @@ export default function TemplatesPage() {
       style={{
         minHeight: "100vh",
         background: "#f5f5f4",
+        padding: "28px 20px 40px",
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-          padding: "40px 20px",
-        }}
-      >
+      <div style={{ maxWidth: "920px", margin: "0 auto" }}>
+        <button
+          onClick={goHome}
+          style={{
+            marginBottom: "20px",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            border: "none",
+            background: "#e7e5e4",
+            color: "#1c1917",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          Home
+        </button>
+
         <h1
           style={{
-            fontSize: "42px",
-            fontWeight: "bold",
-            marginBottom: "10px",
+            fontSize: "44px",
+            margin: "0 0 10px 0",
+            color: "#1c1917",
           }}
         >
           Templates
@@ -88,36 +87,79 @@ export default function TemplatesPage() {
         <p
           style={{
             fontSize: "18px",
-            color: "#555",
-            marginBottom: "30px",
+            color: "#57534e",
+            margin: "0 0 28px 0",
+            maxWidth: "760px",
           }}
         >
           Select a template to start a quote with pre-filled scope language.
         </p>
 
-        <div style={{ display: "grid", gap: "16px" }}>
+        <div
+          style={{
+            display: "grid",
+            gap: "18px",
+          }}
+        >
           {templates.map((template) => (
             <button
-              key={template.id}
+              key={template.title}
               type="button"
-              onClick={() => useTemplate(template)}
+              onClick={() => startFromTemplate(template.scope)}
               style={{
-                background: "white",
-                border: "1px solid #e7e5e4",
-                borderRadius: "12px",
-                padding: "20px",
                 textAlign: "left",
+                width: "100%",
+                background: "#ffffff",
+                color: "#1c1917",
+                border: "1px solid #e7e5e4",
+                borderRadius: "16px",
+                padding: "22px 22px 20px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
                 cursor: "pointer",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
               }}
             >
-              <div style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "8px" }}>
-                {template.name}
+              <div
+                style={{
+                  fontSize: "22px",
+                  fontWeight: 800,
+                  marginBottom: "6px",
+                  color: "#1c1917",
+                }}
+              >
+                {template.title}
               </div>
-              <div style={{ color: "#57534e", lineHeight: 1.6 }}>
-                {template.scopeOfWork.split("\n").slice(0, 2).map((line, i) => (
-                  <div key={i}>{line}</div>
-                ))}
+
+              <div
+                style={{
+                  fontSize: "14px",
+                  color: "#9a3412",
+                  fontWeight: 700,
+                  marginBottom: "12px",
+                }}
+              >
+                Tap to use this template
+              </div>
+
+              <div
+                style={{
+                  fontSize: "15px",
+                  color: "#57534e",
+                  marginBottom: "14px",
+                  lineHeight: 1.55,
+                }}
+              >
+                {template.description}
+              </div>
+
+              <div
+                style={{
+                  fontSize: "16px",
+                  color: "#292524",
+                  lineHeight: 1.7,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                {template.scope}
               </div>
             </button>
           ))}
