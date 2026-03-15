@@ -1,12 +1,9 @@
 "use client";
 
 export default function HomePage() {
-
   function startNewQuote() {
-    // Clear any previous draft so the form opens clean
     localStorage.removeItem("quotesnapEditDraft");
     localStorage.removeItem("quotesnapDraft");
-
     window.location.href = "/new-quote";
   }
 
@@ -22,39 +19,47 @@ export default function HomePage() {
     <main
       style={{
         minHeight: "100vh",
-        background: "#f5f5f4",
+        background:
+          "linear-gradient(180deg, #f5f5f4 0%, #ede9e7 100%)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         fontFamily: "Arial, sans-serif",
-        padding: "20px"
+        padding: "24px",
       }}
     >
       <div
         style={{
           width: "100%",
-          maxWidth: "420px",
-          background: "white",
-          padding: "40px 30px",
-          borderRadius: "16px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+          maxWidth: "430px",
+          background: "#ffffff",
+          padding: "42px 28px 30px",
+          borderRadius: "20px",
+          boxShadow: "0 16px 40px rgba(0,0,0,0.12)",
           textAlign: "center",
-          border: "1px solid #e7e5e4"
+          border: "1px solid #e7e5e4",
         }}
       >
         <img
           src="/icon.png"
+          alt="QuoteSnap icon"
           style={{
-            width: "80px",
-            marginBottom: "20px"
+            width: "104px",
+            height: "104px",
+            marginBottom: "18px",
+            display: "block",
+            marginLeft: "auto",
+            marginRight: "auto",
+            filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.14))",
           }}
         />
 
         <h1
           style={{
-            fontSize: "28px",
-            marginBottom: "6px",
-            color: "#1c1917"
+            fontSize: "34px",
+            margin: "0 0 8px 0",
+            color: "#1c1917",
+            letterSpacing: "-0.02em",
           }}
         >
           QuoteSnap
@@ -62,50 +67,85 @@ export default function HomePage() {
 
         <div
           style={{
+            fontSize: "16px",
+            fontWeight: 700,
+            color: "#9a3412",
+            marginBottom: "6px",
+          }}
+        >
+          Fast Field Quotes for Contractors
+        </div>
+
+        <div
+          style={{
             fontSize: "14px",
             color: "#78716c",
-            marginBottom: "30px"
+            marginBottom: "30px",
+            lineHeight: 1.5,
+          }}
+        >
+          Build polished quotes on-site with photos,
+          templates, saved clients, and PDF export.
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: "14px",
+          }}
+        >
+          <button onClick={startNewQuote} style={primaryButton}>
+            New Quote
+          </button>
+
+          <button onClick={openQuotes} style={secondaryButton}>
+            Quotes
+          </button>
+
+          <button onClick={openTemplates} style={secondaryButton}>
+            Templates
+          </button>
+        </div>
+
+        <div
+          style={{
+            marginTop: "24px",
+            paddingTop: "18px",
+            borderTop: "1px solid #e7e5e4",
+            fontSize: "12px",
+            color: "#a8a29e",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
           }}
         >
           Stupid Simple. Stupid Fast.
         </div>
-
-        <button
-          onClick={startNewQuote}
-          style={buttonStyle("#1c1917")}
-        >
-          New Quote
-        </button>
-
-        <button
-          onClick={openQuotes}
-          style={buttonStyle("#57534e")}
-        >
-          Quotes
-        </button>
-
-        <button
-          onClick={openTemplates}
-          style={buttonStyle("#78716c")}
-        >
-          Templates
-        </button>
       </div>
     </main>
   );
 }
 
-function buttonStyle(color: string) {
-  return {
-    width: "100%",
-    padding: "16px",
-    marginBottom: "12px",
-    borderRadius: "10px",
-    border: "none",
-    background: color,
-    color: "white",
-    fontSize: "16px",
-    fontWeight: "bold" as const,
-    cursor: "pointer"
-  };
-}
+const primaryButton = {
+  width: "100%",
+  padding: "16px",
+  borderRadius: "12px",
+  border: "none",
+  background: "#f97316",
+  color: "#ffffff",
+  fontSize: "16px",
+  fontWeight: "bold" as const,
+  cursor: "pointer",
+  boxShadow: "0 8px 18px rgba(249,115,22,0.28)",
+};
+
+const secondaryButton = {
+  width: "100%",
+  padding: "15px",
+  borderRadius: "12px",
+  border: "1px solid #d6d3d1",
+  background: "#ffffff",
+  color: "#1c1917",
+  fontSize: "16px",
+  fontWeight: "bold" as const,
+  cursor: "pointer",
+};
