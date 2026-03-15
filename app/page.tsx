@@ -1,15 +1,20 @@
 "use client";
 
 export default function HomePage() {
-  function goNewQuote() {
+
+  function startNewQuote() {
+    // Clear any previous draft so the form opens clean
+    localStorage.removeItem("quotesnapEditDraft");
+    localStorage.removeItem("quotesnapDraft");
+
     window.location.href = "/new-quote";
   }
 
-  function goQuotes() {
+  function openQuotes() {
     window.location.href = "/quotes";
   }
 
-  function goTemplates() {
+  function openTemplates() {
     window.location.href = "/templates";
   }
 
@@ -22,67 +27,85 @@ export default function HomePage() {
         justifyContent: "center",
         alignItems: "center",
         fontFamily: "Arial, sans-serif",
-        padding: "20px",
+        padding: "20px"
       }}
     >
       <div
         style={{
-          background: "white",
-          padding: "40px",
-          borderRadius: "14px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
           width: "100%",
-          maxWidth: "380px",
+          maxWidth: "420px",
+          background: "white",
+          padding: "40px 30px",
+          borderRadius: "16px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
           textAlign: "center",
-          border: "1px solid #e7e5e4",
+          border: "1px solid #e7e5e4"
         }}
       >
+        <img
+          src="/icon.png"
+          style={{
+            width: "80px",
+            marginBottom: "20px"
+          }}
+        />
+
         <h1
           style={{
-            fontSize: "32px",
-            marginBottom: "10px",
-            color: "#1c1917",
+            fontSize: "28px",
+            marginBottom: "6px",
+            color: "#1c1917"
           }}
         >
           QuoteSnap
         </h1>
 
-        <p
+        <div
           style={{
-            color: "#57534e",
-            marginBottom: "28px",
-            fontSize: "15px",
+            fontSize: "14px",
+            color: "#78716c",
+            marginBottom: "30px"
           }}
         >
-          Fast field quotes for excavation work
-        </p>
-
-        <div style={{ display: "grid", gap: "14px" }}>
-          <button onClick={goNewQuote} style={buttonStyle}>
-            New Quote
-          </button>
-
-          <button onClick={goQuotes} style={buttonStyle}>
-            Quotes
-          </button>
-
-          <button onClick={goTemplates} style={buttonStyle}>
-            Templates
-          </button>
+          Stupid Simple. Stupid Fast.
         </div>
+
+        <button
+          onClick={startNewQuote}
+          style={buttonStyle("#1c1917")}
+        >
+          New Quote
+        </button>
+
+        <button
+          onClick={openQuotes}
+          style={buttonStyle("#57534e")}
+        >
+          Quotes
+        </button>
+
+        <button
+          onClick={openTemplates}
+          style={buttonStyle("#78716c")}
+        >
+          Templates
+        </button>
       </div>
     </main>
   );
 }
 
-const buttonStyle = {
-  padding: "14px",
-  fontSize: "16px",
-  fontWeight: "bold",
-  borderRadius: "10px",
-  border: "none",
-  background: "#f97316",
-  color: "white",
-  cursor: "pointer",
-  width: "100%",
-};
+function buttonStyle(color: string) {
+  return {
+    width: "100%",
+    padding: "16px",
+    marginBottom: "12px",
+    borderRadius: "10px",
+    border: "none",
+    background: color,
+    color: "white",
+    fontSize: "16px",
+    fontWeight: "bold" as const,
+    cursor: "pointer"
+  };
+}
