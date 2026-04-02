@@ -22,8 +22,42 @@ export default function QuotesPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    migrateLegacyQuotesIfNeeded();
     loadQuotes();
   }, []);
+
+  function migrateLegacyQuotesIfNeeded() {
+    const legacyRaw = localStorage.getItem("quotesnapSavedQuotes");
+    const activeRaw = localStorage.getItem("quotesnapActiveQuotes");
+    const archivedRaw = localStorage.getItem("quotesnapArchivedQuotes");
+
+    const hasNewData =
+      (activeRaw && JSON.parse(activeRaw).length > 0) ||
+      (archivedRaw && JSON.parse(archivedRaw).length > 0);
+
+    if (!legacyRaw || hasNewData) return;
+
+    const legacyQuotes: QuoteItem[] = JSON.parse(legacyRaw);
+
+    const normalized = legacyQuotes.map((q) => ({
+      ...q,
+      status: q.status || "Draft",
+    }));
+
+    const activeQuotes = normalized.filter((q) => q.status !== "Archived");
+    const archivedQuotes = normalized
+      .filter((q) => q.status === "Archived")
+      .map((q) => ({
+        ...q,
+        archivedAt: q.archivedAt || new Date().toISOString(),
+      }));
+
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(activeQuotes));
+    localStorage.setItem(
+      "quotesnapArchivedQuotes",
+      JSON.stringify(archivedQuotes)
+    );
+  }
 
   function loadQuotes() {
     const stored = JSON.parse(
@@ -62,6 +96,7 @@ export default function QuotesPage() {
       quoteNumber: "",
       quoteDate: new Date().toISOString().slice(0, 10),
       status: "Draft",
+      archivedAt: undefined,
     };
 
     localStorage.setItem("quotesnapEditDraft", JSON.stringify(duplicate));
@@ -112,7 +147,7 @@ export default function QuotesPage() {
         JSON.stringify(archived)
       );
 
-      setQuotes(updatedActive);
+      setQuotes([...updatedActive].reverse());
       return;
     }
 
@@ -149,13 +184,15 @@ export default function QuotesPage() {
       }}
     >
       <div style={{ maxWidth: "860px", margin: "0 auto" }}>
-        <button onClick={goHome} style={navButton}>
-          Home
-        </button>
+        <div style={topNavRow}>
+          <button onClick={goHome} style={navButton}>
+            Home
+          </button>
 
-        <button onClick={goArchive} style={navButton}>
-          Archive
-        </button>
+          <button onClick={goArchive} style={navButton}>
+            Archive
+          </button>
+        </div>
 
         <div style={card}>
           <h1 style={title}>Quotes</h1>
@@ -168,7 +205,7 @@ export default function QuotesPage() {
           />
 
           {filtered.length === 0 ? (
-            <div style={emptyBox}>No quotes found.</div>
+            <div style={emptyBox}>No active quotes found.</div>
           ) : (
             <div style={{ display: "grid", gap: "14px" }}>
               {filtered.map((quote) => {
@@ -266,8 +303,6 @@ export default function QuotesPage() {
   );
 }
 
-/* styles (unchanged) */
-
 const card = {
   background: "#fff",
   borderRadius: "20px",
@@ -306,6 +341,7 @@ const rowTop = {
   display: "flex",
   justifyContent: "space-between",
   marginBottom: "12px",
+  gap: "12px",
 };
 
 const clientName = {
@@ -328,6 +364,8 @@ const statusPill = {
   borderRadius: "999px",
   fontSize: "12px",
   fontWeight: 800,
+  whiteSpace: "nowrap" as const,
+  height: "fit-content",
 };
 
 const buttonRow = {
@@ -336,13 +374,18 @@ const buttonRow = {
   gap: "8px",
 };
 
+const topNavRow = {
+  display: "flex",
+  gap: "10px",
+  marginBottom: "12px",
+};
+
 const navButton = {
   padding: "10px 14px",
   borderRadius: "10px",
   border: "1px solid #d6d3d1",
   background: "#fff",
   cursor: "pointer",
-  marginBottom: "12px",
 };
 
 const btnDark = {
