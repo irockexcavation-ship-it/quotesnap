@@ -1,76 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-type SavedClient = {
-  name: string;
-  address: string;
-  contact: string;
-};
+import { useEffect, useState } from "react";
 
 export default function NewQuotePage() {
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [contactInfo, setContactInfo] = useState("");
   const [quoteDate, setQuoteDate] = useState("");
-  const [quoteNumber, setQuoteNumber] = useState("");
   const [projectTotal, setProjectTotal] = useState("");
-  const [startWindow, setStartWindow] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
-  const [bannerImage, setBannerImage] = useState("");
-  const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
-
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setQuoteDate(getTodayDate());
-    setQuoteNumber(generateQuoteNumber());
-    loadSavedClients();
+    setQuoteDate(new Date().toISOString().slice(0, 10));
   }, []);
-
-  function loadSavedClients() {
-    const quotes = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
-
-    const clientMap = new Map<string, SavedClient>();
-
-    for (const quote of quotes) {
-      const name = String(quote.clientName || "").trim();
-      if (!name) continue;
-
-      if (!clientMap.has(name.toLowerCase())) {
-        clientMap.set(name.toLowerCase(), {
-          name,
-          address: String(quote.projectAddress || ""),
-          contact: String(quote.contactInfo || ""),
-        });
-      }
-    }
-
-    setSavedClients(Array.from(clientMap.values()));
-  }
-
-  function getTodayDate() {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  function generateQuoteNumber() {
-    const year = new Date().getFullYear();
-
-    const existingQuotes = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
-
-    const currentYearQuotes = existingQuotes.filter((q: any) =>
-      String(q.quoteNumber || "").startsWith(`IR-${year}-`)
-    );
-
-    const nextNumber = currentYearQuotes.length + 1;
-
-    return `IR-${year}-${String(nextNumber).padStart(3, "0")}`;
-  }
 
   function formatCurrencyInput(value: string) {
     const digits = value.replace(/\D/g, "");
@@ -86,15 +28,12 @@ export default function NewQuotePage() {
   function handlePreview() {
     const quoteData = {
       id: Date.now().toString(),
-      quoteNumber,
       clientName,
       projectAddress,
       contactInfo,
       quoteDate,
       projectTotal,
-      startWindow,
       scopeOfWork,
-      bannerImage,
       status: "Draft",
     };
 
