@@ -13,12 +13,13 @@ type QuoteItem = {
   startWindow?: string;
   scopeOfWork?: string;
   bannerImage?: string;
-  status?: "Draft" | "Sent" | "Approved";
+  status?: "Draft" | "Sent" | "Approved" | "Archived";
 };
 
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
   const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadQuotes();
@@ -87,33 +88,24 @@ export default function QuotesPage() {
 
   function statusColor(status: QuoteItem["status"]) {
     if (status === "Approved") {
-      return {
-        bg: "#dcfce7",
-        text: "#166534",
-        border: "#86efac",
-      };
+      return { bg: "#dcfce7", text: "#166534", border: "#86efac" };
     }
-
     if (status === "Sent") {
-      return {
-        bg: "#dbeafe",
-        text: "#1d4ed8",
-        border: "#93c5fd",
-      };
+      return { bg: "#dbeafe", text: "#1d4ed8", border: "#93c5fd" };
     }
-
-    return {
-      bg: "#fff7ed",
-      text: "#9a3412",
-      border: "#fdba74",
-    };
+    if (status === "Archived") {
+      return { bg: "#e7e5e4", text: "#44403c", border: "#d6d3d1" };
+    }
+    return { bg: "#fff7ed", text: "#9a3412", border: "#fdba74" };
   }
 
-  const filtered = quotes.filter((q) =>
-    `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const filtered = quotes
+    .filter((q) => (showArchived ? true : q.status !== "Archived"))
+    .filter((q) =>
+      `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
 
   return (
     <main
@@ -125,222 +117,113 @@ export default function QuotesPage() {
       }}
     >
       <div style={{ maxWidth: "860px", margin: "0 auto" }}>
-        <button
-          onClick={goHome}
-          style={{
-            marginBottom: "20px",
-            padding: "10px 14px",
-            borderRadius: "10px",
-            border: "1px solid #d6d3d1",
-            background: "#ffffff",
-            color: "#1c1917",
-            cursor: "pointer",
-            fontWeight: 700,
-          }}
-        >
+        <button onClick={goHome} style={navButton}>
           Home
         </button>
 
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "20px",
-            border: "1px solid #e7e5e4",
-            boxShadow: "0 16px 40px rgba(0,0,0,0.10)",
-            padding: "28px 22px 24px",
-          }}
-        >
-          <div style={{ marginBottom: "22px" }}>
-            <h1
-              style={{
-                fontSize: "34px",
-                margin: "0 0 8px 0",
-                color: "#1c1917",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Quotes
-            </h1>
+        <div style={card}>
+          <h1 style={title}>Quotes</h1>
 
-            <div
-              style={{
-                fontSize: "15px",
-                color: "#78716c",
-                lineHeight: 1.5,
-              }}
+          <div style={{ marginBottom: "12px" }}>
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              style={navButton}
             >
-              Search, open, duplicate, update status, or delete saved quotes.
-            </div>
+              {showArchived ? "Hide Archived" : "Show Archived"}
+            </button>
           </div>
 
           <input
             placeholder="Search client, address, or quote #"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px 15px",
-              borderRadius: "12px",
-              border: "1px solid #d6d3d1",
-              marginBottom: "20px",
-              fontSize: "16px",
-              boxSizing: "border-box",
-              background: "#fafaf9",
-            }}
+            style={searchBox}
           />
 
           {filtered.length === 0 ? (
-            <div
-              style={{
-                background: "#fafaf9",
-                border: "1px solid #e7e5e4",
-                borderRadius: "14px",
-                padding: "22px",
-                color: "#78716c",
-                textAlign: "center",
-              }}
-            >
-              No quotes found.
-            </div>
+            <div style={emptyBox}>No quotes found.</div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gap: "14px",
-              }}
-            >
-              {filtered.map((quote, i) => {
+            <div style={{ display: "grid", gap: "14px" }}>
+              {filtered.map((quote) => {
                 const colors = statusColor(quote.status);
 
                 return (
-                  <div
-                    key={quote.id || i}
-                    style={{
-                      background: "#ffffff",
-                      border: "1px solid #e7e5e4",
-                      borderRadius: "16px",
-                      padding: "18px",
-                      boxShadow: "0 3px 10px rgba(0,0,0,0.04)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        gap: "12px",
-                        marginBottom: "12px",
-                      }}
-                    >
+                  <div key={quote.id} style={quoteCard}>
+                    <div style={rowTop}>
                       <div
                         onClick={() => openQuote(quote)}
-                        style={{
-                          flex: 1,
-                          cursor: "pointer",
-                        }}
+                        style={{ flex: 1, cursor: "pointer" }}
                       >
-                        <div
-                          style={{
-                            fontWeight: 800,
-                            fontSize: "19px",
-                            marginBottom: "6px",
-                            color: "#1c1917",
-                          }}
-                        >
+                        <div style={clientName}>
                           {quote.clientName || "Unnamed Client"}
                         </div>
 
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            color: "#57534e",
-                            lineHeight: 1.6,
-                            marginBottom: "6px",
-                          }}
-                        >
+                        <div style={meta}>
                           {quote.quoteNumber || "No Quote #"} •{" "}
                           {quote.quoteDate || "No Date"} •{" "}
                           {quote.projectTotal || "$0"}
                         </div>
 
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            color: "#78716c",
-                            lineHeight: 1.5,
-                          }}
-                        >
+                        <div style={address}>
                           {quote.projectAddress || ""}
                         </div>
                       </div>
 
                       <div
                         style={{
-                          padding: "7px 11px",
-                          borderRadius: "999px",
-                          fontSize: "12px",
-                          fontWeight: 800,
+                          ...statusPill,
                           background: colors.bg,
                           color: colors.text,
                           border: `1px solid ${colors.border}`,
-                          whiteSpace: "nowrap",
                         }}
                       >
                         {quote.status || "Draft"}
                       </div>
                     </div>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => openQuote(quote)}
-                        style={smallButton("#1c1917", "#ffffff")}
-                      >
+                    <div style={buttonRow}>
+                      <button onClick={() => openQuote(quote)} style={btnDark}>
                         Open
                       </button>
 
                       <button
-                        type="button"
                         onClick={() => duplicateQuote(quote)}
-                        style={smallButton("#f97316", "#ffffff")}
+                        style={btnOrange}
                       >
                         Duplicate
                       </button>
 
                       <button
-                        type="button"
                         onClick={() => updateStatus(quote, "Draft")}
-                        style={smallButton("#fff7ed", "#9a3412", "#fdba74")}
+                        style={btnLight}
                       >
                         Draft
                       </button>
 
                       <button
-                        type="button"
                         onClick={() => updateStatus(quote, "Sent")}
-                        style={smallButton("#dbeafe", "#1d4ed8", "#93c5fd")}
+                        style={btnLight}
                       >
                         Sent
                       </button>
 
                       <button
-                        type="button"
                         onClick={() => updateStatus(quote, "Approved")}
-                        style={smallButton("#dcfce7", "#166534", "#86efac")}
+                        style={btnLight}
                       >
                         Approved
                       </button>
 
                       <button
-                        type="button"
+                        onClick={() => updateStatus(quote, "Archived")}
+                        style={btnGray}
+                      >
+                        Archive
+                      </button>
+
+                      <button
                         onClick={() => deleteQuote(quote)}
-                        style={smallButton("#dc2626", "#ffffff")}
+                        style={btnDelete}
                       >
                         Delete
                       </button>
@@ -356,19 +239,126 @@ export default function QuotesPage() {
   );
 }
 
-function smallButton(
-  background: string,
-  color: string,
-  border?: string
-) {
-  return {
-    background,
-    color,
-    border: border ? `1px solid ${border}` : "none",
-    borderRadius: "10px",
-    padding: "10px 12px",
-    fontSize: "13px",
-    fontWeight: "bold" as const,
-    cursor: "pointer",
-  };
-}
+/* styles */
+
+const card = {
+  background: "#fff",
+  borderRadius: "20px",
+  padding: "24px",
+  border: "1px solid #e7e5e4",
+};
+
+const title = {
+  fontSize: "30px",
+  fontWeight: 800,
+  marginBottom: "12px",
+};
+
+const searchBox = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: "12px",
+  border: "1px solid #d6d3d1",
+  marginBottom: "18px",
+};
+
+const emptyBox = {
+  padding: "20px",
+  textAlign: "center" as const,
+  color: "#78716c",
+};
+
+const quoteCard = {
+  border: "1px solid #e7e5e4",
+  borderRadius: "16px",
+  padding: "16px",
+  background: "#fff",
+};
+
+const rowTop = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginBottom: "12px",
+};
+
+const clientName = {
+  fontWeight: 800,
+  fontSize: "18px",
+};
+
+const meta = {
+  fontSize: "14px",
+  color: "#57534e",
+};
+
+const address = {
+  fontSize: "13px",
+  color: "#78716c",
+};
+
+const statusPill = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const buttonRow = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  gap: "8px",
+};
+
+const navButton = {
+  padding: "10px 14px",
+  borderRadius: "10px",
+  border: "1px solid #d6d3d1",
+  background: "#fff",
+  cursor: "pointer",
+  marginBottom: "12px",
+};
+
+const btnDark = {
+  background: "#1c1917",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const btnOrange = {
+  background: "#f97316",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const btnLight = {
+  background: "#fff7ed",
+  color: "#9a3412",
+  border: "1px solid #fdba74",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const btnGray = {
+  background: "#e7e5e4",
+  color: "#44403c",
+  border: "none",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const btnDelete = {
+  background: "#dc2626",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
