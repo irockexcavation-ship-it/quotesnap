@@ -14,12 +14,12 @@ type QuoteItem = {
   scopeOfWork?: string;
   bannerImage?: string;
   status?: "Draft" | "Sent" | "Approved" | "Archived";
+  archivedAt?: string;
 };
 
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
   const [search, setSearch] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadQuotes();
@@ -27,27 +27,27 @@ export default function QuotesPage() {
 
   function loadQuotes() {
     const stored = JSON.parse(
-      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
     );
 
-    const normalized = stored.map((q: QuoteItem) => ({
-      ...q,
-      status: q.status || "Draft",
-    }));
+    setQuotes([...stored].reverse());
+  }
 
-    setQuotes([...normalized].reverse());
-    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(normalized));
+  function saveActiveQuotes(updatedQuotes: QuoteItem[]) {
+    const storageOrder = [...updatedQuotes].reverse();
+    localStorage.setItem(
+      "quotesnapActiveQuotes",
+      JSON.stringify(storageOrder)
+    );
+    setQuotes(updatedQuotes);
   }
 
   function goHome() {
     window.location.href = "/";
   }
 
-  function saveQuotes(updatedQuotes: QuoteItem[]) {
-    const newestFirst = [...updatedQuotes];
-    const storageOrder = [...newestFirst].reverse();
-    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(storageOrder));
-    setQuotes(newestFirst);
+  function goArchive() {
+    window.location.href = "/archive";
   }
 
   function openQuote(quote: QuoteItem) {
@@ -76,14 +76,51 @@ export default function QuotesPage() {
     if (!confirmed) return;
 
     const updated = quotes.filter((q) => q.id !== quoteToDelete.id);
-    saveQuotes(updated);
+    saveActiveQuotes(updated);
   }
 
-  function updateStatus(quoteToUpdate: QuoteItem, status: QuoteItem["status"]) {
+  function updateStatus(
+    quoteToUpdate: QuoteItem,
+    status: QuoteItem["status"]
+  ) {
+    if (status === "Archived") {
+      const active = JSON.parse(
+        localStorage.getItem("quotesnapActiveQuotes") || "[]"
+      );
+
+      const archived = JSON.parse(
+        localStorage.getItem("quotesnapArchivedQuotes") || "[]"
+      );
+
+      const updatedActive = active.filter(
+        (q: QuoteItem) => q.id !== quoteToUpdate.id
+      );
+
+      archived.unshift({
+        ...quoteToUpdate,
+        status: "Archived",
+        archivedAt: new Date().toISOString(),
+      });
+
+      localStorage.setItem(
+        "quotesnapActiveQuotes",
+        JSON.stringify(updatedActive)
+      );
+
+      localStorage.setItem(
+        "quotesnapArchivedQuotes",
+        JSON.stringify(archived)
+      );
+
+      setQuotes(updatedActive);
+      return;
+    }
+
     const updated = quotes.map((q) =>
       q.id === quoteToUpdate.id ? { ...q, status } : q
     );
-    saveQuotes(updated);
+
+    saveActiveQuotes(updated);
   }
 
   function statusColor(status: QuoteItem["status"]) {
@@ -93,19 +130,14 @@ export default function QuotesPage() {
     if (status === "Sent") {
       return { bg: "#dbeafe", text: "#1d4ed8", border: "#93c5fd" };
     }
-    if (status === "Archived") {
-      return { bg: "#e7e5e4", text: "#44403c", border: "#d6d3d1" };
-    }
     return { bg: "#fff7ed", text: "#9a3412", border: "#fdba74" };
   }
 
-  const filtered = quotes
-    .filter((q) => (showArchived ? true : q.status !== "Archived"))
-    .filter((q) =>
-      `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+  const filtered = quotes.filter((q) =>
+    `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
   return (
     <main
@@ -121,17 +153,12 @@ export default function QuotesPage() {
           Home
         </button>
 
+        <button onClick={goArchive} style={navButton}>
+          Archive
+        </button>
+
         <div style={card}>
           <h1 style={title}>Quotes</h1>
-
-          <div style={{ marginBottom: "12px" }}>
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              style={navButton}
-            >
-              {showArchived ? "Hide Archived" : "Show Archived"}
-            </button>
-          </div>
 
           <input
             placeholder="Search client, address, or quote #"
@@ -239,7 +266,7 @@ export default function QuotesPage() {
   );
 }
 
-/* styles */
+/* styles (unchanged) */
 
 const card = {
   background: "#fff",
