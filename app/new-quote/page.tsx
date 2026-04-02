@@ -24,27 +24,8 @@ export default function NewQuotePage() {
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const editData = localStorage.getItem("quotesnapEditDraft");
-
-    if (editData) {
-      const parsed = JSON.parse(editData);
-
-      setClientName(parsed.clientName || "");
-      setProjectAddress(parsed.projectAddress || "");
-      setContactInfo(parsed.contactInfo || "");
-      setQuoteDate(parsed.quoteDate || getTodayDate());
-      setQuoteNumber(parsed.quoteNumber || generateQuoteNumber());
-      setProjectTotal(parsed.projectTotal || "");
-      setStartWindow(parsed.startWindow || "");
-      setScopeOfWork(parsed.scopeOfWork || "");
-      setBannerImage(parsed.bannerImage || "");
-
-      localStorage.removeItem("quotesnapEditDraft");
-    } else {
-      setQuoteDate(getTodayDate());
-      setQuoteNumber(generateQuoteNumber());
-    }
-
+    setQuoteDate(getTodayDate());
+    setQuoteNumber(generateQuoteNumber());
     loadSavedClients();
   }, []);
 
@@ -72,8 +53,7 @@ export default function NewQuotePage() {
   }
 
   function getTodayDate() {
-    const today = new Date();
-    return today.toISOString().slice(0, 10);
+    return new Date().toISOString().slice(0, 10);
   }
 
   function generateQuoteNumber() {
@@ -92,63 +72,10 @@ export default function NewQuotePage() {
     return `IR-${year}-${String(nextNumber).padStart(3, "0")}`;
   }
 
-  function resizeImage(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const img = new Image();
-
-        img.onload = () => {
-          const maxWidth = 1400;
-          const maxHeight = 900;
-
-          let { width, height } = img;
-
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return reject();
-
-          ctx.drawImage(img, 0, 0, width, height);
-
-          resolve(canvas.toDataURL("image/jpeg", 0.72));
-        };
-
-        img.src = reader.result as string;
-      };
-
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function handleImageUpload(e: any) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const img = await resizeImage(file);
-      setBannerImage(img);
-    } catch {
-      alert("Image failed.");
-    }
-  }
-
   function formatCurrencyInput(value: string) {
     const digits = value.replace(/\D/g, "");
     if (!digits) return "";
+
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -221,7 +148,9 @@ export default function NewQuotePage() {
       <input
         placeholder="Total"
         value={projectTotal}
-        onChange={(e) => setProjectTotal(formatCurrencyInput(e.target.value))}
+        onChange={(e) =>
+          setProjectTotal(formatCurrencyInput(e.target.value))
+        }
       />
 
       <textarea
