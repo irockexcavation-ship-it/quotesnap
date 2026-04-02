@@ -50,7 +50,7 @@ export default function NewQuotePage() {
 
   function loadSavedClients() {
     const quotes = JSON.parse(
-      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
     );
 
     const clientMap = new Map<string, SavedClient>();
@@ -73,18 +73,14 @@ export default function NewQuotePage() {
 
   function getTodayDate() {
     const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return today.toISOString().slice(0, 10);
   }
 
   function generateQuoteNumber() {
-    const today = new Date();
-    const year = today.getFullYear();
+    const year = new Date().getFullYear();
 
     const existingQuotes = JSON.parse(
-      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
     );
 
     const currentYearQuotes = existingQuotes.filter((q: any) =>
@@ -124,88 +120,40 @@ export default function NewQuotePage() {
           canvas.height = height;
 
           const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            reject(new Error("Could not create canvas context."));
-            return;
-          }
+          if (!ctx) return reject();
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          const compressed = canvas.toDataURL("image/jpeg", 0.72);
-          resolve(compressed);
+          resolve(canvas.toDataURL("image/jpeg", 0.72));
         };
 
-        img.onerror = () => reject(new Error("Could not load image."));
         img.src = reader.result as string;
       };
 
-      reader.onerror = () => reject(new Error("Could not read file."));
       reader.readAsDataURL(file);
     });
   }
 
-  async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handleImageUpload(e: any) {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const compressedImage = await resizeImage(file);
-      setBannerImage(compressedImage);
-    } catch (error) {
-      alert("That image could not be processed.");
-    } finally {
-      event.target.value = "";
+      const img = await resizeImage(file);
+      setBannerImage(img);
+    } catch {
+      alert("Image failed.");
     }
   }
 
   function formatCurrencyInput(value: string) {
-    const digitsOnly = value.replace(/\D/g, "");
-
-    if (!digitsOnly) return "";
-
-    const numberValue = Number(digitsOnly);
-
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
       maximumFractionDigits: 0,
-    }).format(numberValue);
-  }
-
-  function handleProjectTotalChange(value: string) {
-    const formatted = formatCurrencyInput(value);
-    setProjectTotal(formatted);
-  }
-
-  function applyClientAutofill(nameValue: string) {
-    const match = savedClients.find(
-      (client) => client.name.toLowerCase() === nameValue.trim().toLowerCase()
-    );
-
-    if (!match) return;
-
-    setClientName(match.name);
-    setProjectAddress(match.address || "");
-    setContactInfo(match.contact || "");
-  }
-
-  function handleClientNameChange(value: string) {
-    setClientName(value);
-
-    const exactMatch = savedClients.find(
-      (client) => client.name.toLowerCase() === value.trim().toLowerCase()
-    );
-
-    if (exactMatch) {
-      setProjectAddress(exactMatch.address || "");
-      setContactInfo(exactMatch.contact || "");
-    }
-  }
-
-  function selectSavedClient(client: SavedClient) {
-    setClientName(client.name);
-    setProjectAddress(client.address || "");
-    setContactInfo(client.contact || "");
+    }).format(Number(digits));
   }
 
   function handlePreview() {
@@ -220,39 +168,18 @@ export default function NewQuotePage() {
       startWindow,
       scopeOfWork,
       bannerImage,
+      status: "Draft",
     };
 
-    try {
-      localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
-    } catch (error) {
-      alert(
-        "This quote is too large to save in the browser. Try a smaller photo."
-      );
-      return;
-    }
+    localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
 
-    const existingQuotes =
-      JSON.parse(localStorage.getItem("quotesnapSavedQuotes") || "[]");
-
-    const quoteSummary = {
-      id: quoteData.id,
-      quoteNumber: quoteData.quoteNumber,
-      clientName: quoteData.clientName,
-      projectAddress: quoteData.projectAddress,
-      contactInfo: quoteData.contactInfo,
-      quoteDate: quoteData.quoteDate,
-      projectTotal: quoteData.projectTotal,
-      startWindow: quoteData.startWindow,
-      scopeOfWork: quoteData.scopeOfWork,
-      bannerImage: quoteData.bannerImage,
-    };
-
-    const updatedQuotes = [quoteSummary, ...existingQuotes];
-
-    localStorage.setItem(
-      "quotesnapSavedQuotes",
-      JSON.stringify(updatedQuotes)
+    const existing = JSON.parse(
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
     );
+
+    existing.unshift(quoteData);
+
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(existing));
 
     window.location.href = "/preview";
   }
@@ -261,348 +188,49 @@ export default function NewQuotePage() {
     window.location.href = "/";
   }
 
-  const recentClients = savedClients.slice(0, 6);
-
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f5f5f4",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-          padding: "24px 20px 40px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-            marginBottom: "18px",
-          }}
-        >
-          <button
-            type="button"
-            onClick={goHome}
-            style={topButton("#e7e5e4", "#1c1917")}
-          >
-            Home
-          </button>
-        </div>
+    <main style={{ padding: 20 }}>
+      <button onClick={goHome}>Home</button>
 
-        <h1
-          style={{
-            fontSize: "36px",
-            fontWeight: "bold",
-            marginBottom: "10px",
-            color: "#1c1917",
-          }}
-        >
-          New Quote
-        </h1>
+      <h1>New Quote</h1>
 
-        <p
-          style={{
-            fontSize: "18px",
-            color: "#57534e",
-            marginBottom: "30px",
-          }}
-        >
-          Enter the project details below to build a quote.
-        </p>
+      <input
+        placeholder="Client Name"
+        value={clientName}
+        onChange={(e) => setClientName(e.target.value)}
+      />
 
-        <div
-          style={{
-            background: "white",
-            padding: "24px",
-            borderRadius: "14px",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-            border: "1px solid #e7e5e4",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gap: "18px",
-            }}
-          >
-            <div>
-              <label style={labelStyle}>Banner Photo</label>
+      <input
+        placeholder="Address"
+        value={projectAddress}
+        onChange={(e) => setProjectAddress(e.target.value)}
+      />
 
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageUpload}
-                style={{ display: "none" }}
-              />
+      <input
+        placeholder="Contact"
+        value={contactInfo}
+        onChange={(e) => setContactInfo(e.target.value)}
+      />
 
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                style={{ display: "none" }}
-              />
+      <input
+        type="date"
+        value={quoteDate}
+        onChange={(e) => setQuoteDate(e.target.value)}
+      />
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                  marginBottom: "12px",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  style={topButton("#1c1917", "#ffffff")}
-                >
-                  Take Job Photo
-                </button>
+      <input
+        placeholder="Total"
+        value={projectTotal}
+        onChange={(e) => setProjectTotal(formatCurrencyInput(e.target.value))}
+      />
 
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  style={topButton("#57534e", "#ffffff")}
-                >
-                  Choose Existing Photo
-                </button>
-              </div>
+      <textarea
+        placeholder="Scope"
+        value={scopeOfWork}
+        onChange={(e) => setScopeOfWork(e.target.value)}
+      />
 
-              {bannerImage && (
-                <div style={{ marginTop: "12px" }}>
-                  <img
-                    src={bannerImage}
-                    alt="Banner preview"
-                    style={{
-                      width: "100%",
-                      maxHeight: "220px",
-                      objectFit: "cover",
-                      borderRadius: "10px",
-                      border: "1px solid #d6d3d1",
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                padding: "12px 14px",
-                background: "#fff7ed",
-                border: "1px solid #fdba74",
-                borderRadius: "10px",
-                color: "#9a3412",
-                fontSize: "14px",
-              }}
-            >
-              Company COI will be attached automatically from <strong>/public/coi.pdf</strong>.
-            </div>
-
-            <div>
-              <label style={labelStyle}>Quote Number</label>
-              <input
-                type="text"
-                value={quoteNumber}
-                readOnly
-                style={{
-                  ...inputStyle,
-                  background: "#fafaf9",
-                  color: "#57534e",
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Client Name</label>
-              <input
-                type="text"
-                placeholder="John Smith"
-                value={clientName}
-                onChange={(e) => handleClientNameChange(e.target.value)}
-                onBlur={(e) => applyClientAutofill(e.target.value)}
-                style={inputStyle}
-                list="saved-clients"
-              />
-              <datalist id="saved-clients">
-                {savedClients.map((client) => (
-                  <option key={client.name} value={client.name} />
-                ))}
-              </datalist>
-
-              {recentClients.length > 0 && (
-                <div style={{ marginTop: "10px" }}>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      color: "#78716c",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    Recent Clients
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {recentClients.map((client) => (
-                      <button
-                        key={client.name}
-                        type="button"
-                        onClick={() => selectSavedClient(client)}
-                        style={{
-                          padding: "7px 10px",
-                          borderRadius: "999px",
-                          border: "1px solid #fdba74",
-                          background: "#fff7ed",
-                          color: "#9a3412",
-                          fontSize: "13px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {client.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label style={labelStyle}>Project Address</label>
-              <input
-                type="text"
-                placeholder="123 Gravel Rd, New Castle, KY"
-                value={projectAddress}
-                onChange={(e) => setProjectAddress(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Phone / Email</label>
-              <input
-                type="text"
-                placeholder="(555) 555-5555 / john@email.com"
-                value={contactInfo}
-                onChange={(e) => setContactInfo(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Date</label>
-              <input
-                type="date"
-                value={quoteDate}
-                onChange={(e) => setQuoteDate(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Project Total</label>
-              <input
-                type="text"
-                placeholder="$4,800"
-                value={projectTotal}
-                onChange={(e) => handleProjectTotalChange(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Estimated Start Window</label>
-              <input
-                type="text"
-                placeholder="2–3 weeks after approval"
-                value={startWindow}
-                onChange={(e) => setStartWindow(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Scope of Work</label>
-              <textarea
-                placeholder="• Power rake existing gravel driveway surface&#10;• Add and spread 20 tons of DGA&#10;• Compact with vibratory roller"
-                rows={8}
-                value={scopeOfWork}
-                onChange={(e) => setScopeOfWork(e.target.value)}
-                style={textAreaStyle}
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handlePreview}
-              style={{
-                background: "#f97316",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                padding: "14px 18px",
-                fontSize: "16px",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Preview Quote
-            </button>
-          </div>
-        </div>
-      </div>
+      <button onClick={handlePreview}>Preview Quote</button>
     </main>
   );
 }
-
-function topButton(background: string, color: string) {
-  return {
-    padding: "12px 18px",
-    fontSize: "15px",
-    borderRadius: "8px",
-    border: "none",
-    background,
-    color,
-    cursor: "pointer",
-    fontWeight: "bold" as const,
-  };
-}
-
-const labelStyle = {
-  display: "block",
-  marginBottom: "6px",
-  fontWeight: "bold",
-  color: "#1c1917",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: "12px",
-  borderRadius: "8px",
-  border: "1px solid #d6d3d1",
-  fontSize: "16px",
-  boxSizing: "border-box" as const,
-};
-
-const textAreaStyle = {
-  width: "100%",
-  padding: "12px",
-  borderRadius: "8px",
-  border: "1px solid #d6d3d1",
-  fontSize: "16px",
-  boxSizing: "border-box" as const,
-  resize: "vertical" as const,
-};
