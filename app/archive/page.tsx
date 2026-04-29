@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
+type QuoteStatus = "Draft" | "Sent" | "Approved" | "Completed" | "Archived";
 
 type QuoteItem = {
   id: string;
@@ -17,6 +17,9 @@ type QuoteItem = {
   bannerImage?: string;
   status?: QuoteStatus;
   archivedAt?: string;
+  completedAt?: string;
+  sentAt?: string;
+  archiveReason?: string;
 };
 
 export default function ArchivePage() {
@@ -108,7 +111,7 @@ export default function ArchivePage() {
     window.location.href = "/preview";
   }
 
-  function restoreQuote(quoteToRestore: QuoteItem, status: Exclude<QuoteStatus, "Archived">) {
+  function restoreQuote(quoteToRestore: QuoteItem, status: Exclude<QuoteStatus, "Archived" | "Completed">) {
     const archived = safeParseQuotes("quotesnapArchivedQuotes");
     const active = safeParseQuotes("quotesnapActiveQuotes");
 
@@ -124,6 +127,8 @@ export default function ArchivePage() {
       ...quoteToRestore,
       status,
       archivedAt: undefined,
+      completedAt: undefined,
+      archiveReason: undefined,
     };
 
     cleanedActive.unshift(restoredQuote);
@@ -167,6 +172,46 @@ export default function ArchivePage() {
     alert("Duplicate cleanup complete.");
   }
 
+  function getArchiveLabel(quote: QuoteItem) {
+    if (quote.status === "Completed" || quote.completedAt) return "Completed Job";
+    if (quote.archiveReason === "Auto-archived after 30 days sent") return "Old Sent Quote";
+    return "Archived Quote";
+  }
+
+  function getArchivePillStyle(quote: QuoteItem) {
+    if (quote.status === "Completed" || quote.completedAt) {
+      return {
+        ...archivedPill,
+        background: "#dcfce7",
+        color: "#166534",
+        border: "1px solid #86efac",
+      };
+    }
+
+    if (quote.archiveReason === "Auto-archived after 30 days sent") {
+      return {
+        ...archivedPill,
+        background: "#dbeafe",
+        color: "#1d4ed8",
+        border: "1px solid #93c5fd",
+      };
+    }
+
+    return archivedPill;
+  }
+
+  function getArchiveDateLabel(quote: QuoteItem) {
+    if (quote.status === "Completed" || quote.completedAt) {
+      return `Completed: ${quote.completedAt ? new Date(quote.completedAt).toLocaleDateString() : "Unknown"}`;
+    }
+
+    if (quote.archiveReason === "Auto-archived after 30 days sent") {
+      return `Auto-archived: ${quote.archivedAt ? new Date(quote.archivedAt).toLocaleDateString() : "Unknown"}`;
+    }
+
+    return `Archived: ${quote.archivedAt ? new Date(quote.archivedAt).toLocaleDateString() : "Unknown"}`;
+  }
+
   const filtered = quotes.filter((quote) =>
     `${quote.clientName || ""} ${quote.quoteNumber || ""} ${
       quote.projectAddress || ""
@@ -204,7 +249,7 @@ export default function ArchivePage() {
             <div>
               <h1 style={title}>Archive</h1>
               <p style={subtitle}>
-                Completed, archived, and old quotes live here.
+                Completed jobs, old sent quotes, and manually archived quotes live here.
               </p>
             </div>
 
@@ -246,14 +291,15 @@ export default function ArchivePage() {
                       </div>
 
                       <div style={archivedMeta}>
-                        Archived:{" "}
-                        {quote.archivedAt
-                          ? new Date(quote.archivedAt).toLocaleDateString()
-                          : "Unknown"}
+                        {getArchiveDateLabel(quote)}
                       </div>
+
+                      {quote.archiveReason ? (
+                        <div style={archiveReasonStyle}>{quote.archiveReason}</div>
+                      ) : null}
                     </div>
 
-                    <div style={archivedPill}>Archived</div>
+                    <div style={getArchivePillStyle(quote)}>{getArchiveLabel(quote)}</div>
                   </div>
 
                   <div style={buttonRow}>
@@ -368,6 +414,12 @@ const archivedMeta = {
   fontSize: "12px",
   color: "#a8a29e",
   marginTop: "6px",
+};
+
+const archiveReasonStyle = {
+  fontSize: "12px",
+  color: "#78716c",
+  marginTop: "4px",
 };
 
 const archivedPill = {

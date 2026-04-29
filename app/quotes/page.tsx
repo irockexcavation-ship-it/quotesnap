@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
+type QuoteStatus = "Draft" | "Sent" | "Approved" | "Completed" | "Archived";
 
 type QuoteItem = {
   id: string;
@@ -17,6 +17,10 @@ type QuoteItem = {
   bannerImage?: string;
   status?: QuoteStatus;
   archivedAt?: string;
+  completedAt?: string;
+  sentAt?: string;
+  approvedAt?: string;
+  archiveReason?: string;
 };
 
 export default function QuotesPage() {
@@ -26,6 +30,7 @@ export default function QuotesPage() {
   useEffect(() => {
     migrateLegacyQuotesIfNeeded();
     cleanDuplicateActiveQuotes();
+    autoArchiveOldSentQuotes();
     loadQuotes();
   }, []);
 
@@ -91,6 +96,49 @@ export default function QuotesPage() {
     if (cleaned.length !== active.length) {
       localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(cleaned));
     }
+  }
+
+  function getQuoteAgeDate(quote: QuoteItem) {
+    const dateValue = quote.sentAt || quote.quoteDate || "";
+    const parsed = new Date(dateValue);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function isSentOlderThan30Days(quote: QuoteItem) {
+    if (quote.status !== "Sent") return false;
+
+    const ageDate = getQuoteAgeDate(quote);
+    if (!ageDate) return false;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return ageDate < thirtyDaysAgo;
+  }
+
+  function autoArchiveOldSentQuotes() {
+    const active = dedupeQuotes(safeParseQuotes("quotesnapActiveQuotes"));
+    const archived = dedupeQuotes(safeParseQuotes("quotesnapArchivedQuotes"));
+
+    const oldSentQuotes = active.filter(isSentOlderThan30Days);
+    if (oldSentQuotes.length === 0) return;
+
+    const oldSentIds = new Set(oldSentQuotes.map((quote) => quote.id));
+    const remainingActive = active.filter((quote) => !oldSentIds.has(quote.id));
+    const archiveWithoutDuplicates = archived.filter((quote) => !oldSentIds.has(quote.id));
+
+    const movedToArchive = oldSentQuotes.map((quote) => ({
+      ...quote,
+      status: "Archived" as QuoteStatus,
+      archivedAt: new Date().toISOString(),
+      archiveReason: "Auto-archived after 30 days sent",
+    }));
+
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(remainingActive));
+    localStorage.setItem(
+      "quotesnapArchivedQuotes",
+      JSON.stringify(dedupeQuotes([...movedToArchive, ...archiveWithoutDuplicates]))
+    );
   }
 
   function loadQuotes() {
@@ -171,6 +219,7 @@ export default function QuotesPage() {
         ...quoteToUpdate,
         status: "Archived",
         archivedAt: new Date().toISOString(),
+        archiveReason: "Manually archived",
       });
 
       localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedActive));
@@ -183,9 +232,17 @@ export default function QuotesPage() {
       return;
     }
 
-    const updatedActive = cleanedActive.map((q) =>
-      q.id === quoteToUpdate.id ? { ...q, status, archivedAt: undefined } : q
-    );
+    const updatedActive = cleanedActive.map((q) => {
+      if (q.id !== quoteToUpdate.id) return q;
+
+      return {
+        ...q,
+        status,
+        archivedAt: undefined,
+        sentAt: status === "Sent" ? q.sentAt || new Date().toISOString() : q.sentAt,
+        approvedAt: status === "Approved" ? new Date().toISOString() : q.approvedAt,
+      };
+    });
 
     localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedActive));
     setQuotes([...updatedActive].reverse());
@@ -237,7 +294,7 @@ export default function QuotesPage() {
           <h1 style={title}>Quotes</h1>
 
           <p style={subtitle}>
-            Draft and sent quotes live here. Approved jobs move to Current Jobs.
+            Draft and sent quotes live here. Approved jobs move to Current Jobs. Sent quotes auto-archive after 30 days.
           </p>
 
           <input

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
+type QuoteStatus = "Draft" | "Sent" | "Approved" | "Completed" | "Archived";
 
 type QuoteItem = {
   id: string;
@@ -18,6 +18,9 @@ type QuoteItem = {
   status?: QuoteStatus;
   approvedAt?: string;
   completedAt?: string;
+  sentAt?: string;
+  archivedAt?: string;
+  archiveReason?: string;
 };
 
 const ACTIVE_KEY = "quotesnapActiveQuotes";
@@ -76,8 +79,10 @@ export default function CurrentJobsPage() {
 
     const completedJob: QuoteItem = {
       ...job,
-      status: "Archived",
+      status: "Completed",
       completedAt: new Date().toISOString(),
+      archivedAt: new Date().toISOString(),
+      archiveReason: "Completed job",
     };
 
     const remainingActive = activeQuotes.filter((quote) => quote.id !== jobId);
