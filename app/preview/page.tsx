@@ -182,12 +182,17 @@ export default function PreviewPage() {
     const finalBytes =
       await mergedPdf.save();
 
-    const blob = new Blob(
-      [finalBytes.buffer],
-      {
-        type: "application/pdf",
-      }
-    );
+    const pdfBuffer = finalBytes.buffer.slice(
+  finalBytes.byteOffset,
+  finalBytes.byteOffset + finalBytes.byteLength
+);
+
+const blob = new Blob(
+  [pdfBuffer as ArrayBuffer],
+  {
+    type: "application/pdf",
+  }
+);
 
     const url =
       URL.createObjectURL(blob);
