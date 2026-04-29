@@ -252,6 +252,30 @@ export default function PreviewPage() {
     document.body.removeChild(link);
   }
 
+
+  function handleApproveJob() {
+    const approvedQuote = {
+      ...quote,
+      status: "Approved",
+      approvedAt: quote.approvedAt || new Date().toISOString(),
+    };
+
+    const activeQuotes = JSON.parse(
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
+    );
+
+    const updatedQuotes = activeQuotes.filter((q: any) => q.id !== approvedQuote.id);
+    updatedQuotes.unshift(approvedQuote);
+
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedQuotes));
+    localStorage.setItem("quotesnapDraft", JSON.stringify(approvedQuote));
+    setQuote(approvedQuote);
+  }
+
+  function goCurrentJobs() {
+    window.location.href = "/current-jobs";
+  }
+
   function handleEdit() {
     localStorage.setItem("quotesnapEditDraft", JSON.stringify(quote));
     window.location.href = "/new-quote";
@@ -318,6 +342,14 @@ export default function PreviewPage() {
 
         <button onClick={sendQuoteText} style={topButton("#15803d", "#ffffff")}>
           Send Quote Text
+        </button>
+
+        <button onClick={handleApproveJob} style={topButton("#16a34a", "#ffffff")}>
+          Mark Approved
+        </button>
+
+        <button onClick={goCurrentJobs} style={topButton("#7c2d12", "#ffffff")}>
+          Current Jobs
         </button>
 
         <button onClick={handleEdit} style={topButton("#d6d3d1", "#1c1917")}>

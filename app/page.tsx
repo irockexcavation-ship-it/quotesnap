@@ -11,6 +11,10 @@ export default function HomePage() {
     window.location.href = "/quotes";
   }
 
+  function openCurrentJobs() {
+    window.location.href = "/current-jobs";
+  }
+
   function openTemplates() {
     window.location.href = "/templates";
   }
@@ -100,6 +104,10 @@ export default function HomePage() {
 
           <button onClick={openQuotes} style={secondaryButton}>
             Quotes
+          </button>
+
+          <button onClick={openCurrentJobs} style={secondaryButton}>
+            Current Jobs
           </button>
 
           <button onClick={openTemplates} style={secondaryButton}>
