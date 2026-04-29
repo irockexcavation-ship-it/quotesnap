@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
+
 type QuoteItem = {
   id: string;
   quoteNumber?: string;
@@ -13,7 +15,7 @@ type QuoteItem = {
   startWindow?: string;
   scopeOfWork?: string;
   bannerImage?: string;
-  status?: "Draft" | "Sent" | "Approved" | "Archived";
+  status?: QuoteStatus;
   archivedAt?: string;
 };
 
@@ -23,8 +25,32 @@ export default function QuotesPage() {
 
   useEffect(() => {
     migrateLegacyQuotesIfNeeded();
+    cleanDuplicateActiveQuotes();
     loadQuotes();
   }, []);
+
+  function safeParseQuotes(key: string): QuoteItem[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function dedupeQuotes(items: QuoteItem[]) {
+    const seen = new Set<string>();
+    const cleaned: QuoteItem[] = [];
+
+    for (const quote of items) {
+      const key = quote.id || `${quote.quoteNumber || ""}-${quote.clientName || ""}-${quote.projectAddress || ""}`;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      cleaned.push(quote);
+    }
+
+    return cleaned;
+  }
 
   function migrateLegacyQuotesIfNeeded() {
     const legacyRaw = localStorage.getItem("quotesnapSavedQuotes");
@@ -32,59 +58,56 @@ export default function QuotesPage() {
     const archivedRaw = localStorage.getItem("quotesnapArchivedQuotes");
 
     const hasNewData =
-      (activeRaw && JSON.parse(activeRaw).length > 0) ||
-      (archivedRaw && JSON.parse(archivedRaw).length > 0);
+      (activeRaw && safeParseQuotes("quotesnapActiveQuotes").length > 0) ||
+      (archivedRaw && safeParseQuotes("quotesnapArchivedQuotes").length > 0);
 
     if (!legacyRaw || hasNewData) return;
 
-    const legacyQuotes: QuoteItem[] = JSON.parse(legacyRaw);
+    const legacyQuotes: QuoteItem[] = safeParseQuotes("quotesnapSavedQuotes");
 
     const normalized = legacyQuotes.map((q) => ({
       ...q,
       status: q.status || "Draft",
     }));
 
-    const activeQuotes = normalized.filter((q) => q.status !== "Archived");
-    const archivedQuotes = normalized
-      .filter((q) => q.status === "Archived")
-      .map((q) => ({
-        ...q,
-        archivedAt: q.archivedAt || new Date().toISOString(),
-      }));
+    const activeQuotes = dedupeQuotes(normalized.filter((q) => q.status !== "Archived"));
+    const archivedQuotes = dedupeQuotes(
+      normalized
+        .filter((q) => q.status === "Archived")
+        .map((q) => ({
+          ...q,
+          archivedAt: q.archivedAt || new Date().toISOString(),
+        }))
+    );
 
     localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(activeQuotes));
-    localStorage.setItem(
-      "quotesnapArchivedQuotes",
-      JSON.stringify(archivedQuotes)
-    );
+    localStorage.setItem("quotesnapArchivedQuotes", JSON.stringify(archivedQuotes));
+  }
+
+  function cleanDuplicateActiveQuotes() {
+    const active = safeParseQuotes("quotesnapActiveQuotes");
+    const cleaned = dedupeQuotes(active);
+
+    if (cleaned.length !== active.length) {
+      localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(cleaned));
+    }
   }
 
   function loadQuotes() {
-    const stored: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
+    const stored = safeParseQuotes("quotesnapActiveQuotes");
+    const cleaned = dedupeQuotes(stored);
 
-    setQuotes(
-      [...stored]
-        .filter((q) => q.status !== "Approved")
-        .reverse()
-    );
+    if (cleaned.length !== stored.length) {
+      localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(cleaned));
+    }
+
+    setQuotes([...cleaned].reverse());
   }
 
   function saveActiveQuotes(updatedQuotes: QuoteItem[]) {
-    const existingActive: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
-
-    const approvedJobs = existingActive.filter((q) => q.status === "Approved");
-    const storageOrder = [...updatedQuotes].reverse();
-
-    localStorage.setItem(
-      "quotesnapActiveQuotes",
-      JSON.stringify([...storageOrder, ...approvedJobs])
-    );
-
-    setQuotes(updatedQuotes.filter((q) => q.status !== "Approved"));
+    const storageOrder = dedupeQuotes([...updatedQuotes].reverse());
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(storageOrder));
+    setQuotes([...storageOrder].reverse());
   }
 
   function goHome() {
@@ -129,71 +152,43 @@ export default function QuotesPage() {
     saveActiveQuotes(updated);
   }
 
-  function updateStatus(
-    quoteToUpdate: QuoteItem,
-    status: QuoteItem["status"]
-  ) {
-    const active: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
+  function updateStatus(quoteToUpdate: QuoteItem, status: QuoteStatus) {
+    const active = safeParseQuotes("quotesnapActiveQuotes");
+    const cleanedActive = dedupeQuotes(active);
 
     if (status === "Archived") {
-      const archived: QuoteItem[] = JSON.parse(
-        localStorage.getItem("quotesnapArchivedQuotes") || "[]"
-      );
+      const archived = safeParseQuotes("quotesnapArchivedQuotes");
 
-      const updatedActive = active.filter(
+      const updatedActive = cleanedActive.filter(
         (q: QuoteItem) => q.id !== quoteToUpdate.id
       );
 
-      const archivedQuote = {
+      const cleanedArchived = archived.filter(
+        (q: QuoteItem) => q.id !== quoteToUpdate.id
+      );
+
+      cleanedArchived.unshift({
         ...quoteToUpdate,
-        status: "Archived" as const,
+        status: "Archived",
         archivedAt: new Date().toISOString(),
-      };
+      });
 
-      const archivedWithoutDuplicate = archived.filter(
-        (q: QuoteItem) => q.id !== quoteToUpdate.id
-      );
-
-      localStorage.setItem(
-        "quotesnapActiveQuotes",
-        JSON.stringify(updatedActive)
-      );
-
+      localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedActive));
       localStorage.setItem(
         "quotesnapArchivedQuotes",
-        JSON.stringify([archivedQuote, ...archivedWithoutDuplicate])
+        JSON.stringify(dedupeQuotes(cleanedArchived))
       );
 
-      setQuotes(
-        [...updatedActive]
-          .filter((q) => q.status !== "Approved")
-          .reverse()
-      );
+      setQuotes([...updatedActive].reverse());
       return;
     }
 
-    const updatedActive = active.map((q) =>
-      q.id === quoteToUpdate.id
-        ? {
-            ...q,
-            status,
-            approvedAt: status === "Approved" ? new Date().toISOString() : q.approvedAt,
-          }
-        : q
+    const updatedActive = cleanedActive.map((q) =>
+      q.id === quoteToUpdate.id ? { ...q, status, archivedAt: undefined } : q
     );
 
-    localStorage.setItem(
-      "quotesnapActiveQuotes",
-      JSON.stringify(updatedActive)
-    );
-
-    setQuotes(
-      [...updatedActive]
-        .filter((q) => q.status !== "Approved")
-        .reverse()
-    );
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedActive));
+    setQuotes([...updatedActive].reverse());
   }
 
   function statusColor(status: QuoteItem["status"]) {
@@ -206,7 +201,9 @@ export default function QuotesPage() {
     return { bg: "#fff7ed", text: "#9a3412", border: "#fdba74" };
   }
 
-  const filtered = quotes.filter((q) =>
+  const visibleQuotes = quotes.filter((q) => (q.status || "Draft") !== "Approved");
+
+  const filtered = visibleQuotes.filter((q) =>
     `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -227,19 +224,20 @@ export default function QuotesPage() {
             Home
           </button>
 
-          <button onClick={goArchive} style={navButton}>
-            Archive
-          </button>
-
           <button onClick={goCurrentJobs} style={navButton}>
             Current Jobs
+          </button>
+
+          <button onClick={goArchive} style={navButton}>
+            Archive
           </button>
         </div>
 
         <div style={card}>
           <h1 style={title}>Quotes</h1>
+
           <p style={subtitle}>
-            Draft and sent quotes live here. Approved quotes move to Current Jobs.
+            Draft and sent quotes live here. Approved jobs move to Current Jobs.
           </p>
 
           <input
@@ -268,14 +266,12 @@ export default function QuotesPage() {
                         </div>
 
                         <div style={meta}>
-                          {quote.quoteNumber || "No Quote #"} •{" "}
-                          {quote.quoteDate || "No Date"} •{" "}
+                          {quote.quoteNumber || "No Quote #"} • {" "}
+                          {quote.quoteDate || "No Date"} • {" "}
                           {quote.projectTotal || "$0"}
                         </div>
 
-                        <div style={address}>
-                          {quote.projectAddress || ""}
-                        </div>
+                        <div style={address}>{quote.projectAddress || ""}</div>
                       </div>
 
                       <div
@@ -358,14 +354,14 @@ const card = {
 const title = {
   fontSize: "30px",
   fontWeight: 800,
-  marginBottom: "12px",
+  marginBottom: "8px",
 };
 
 const subtitle = {
-  margin: "-4px 0 16px 0",
-  color: "#57534e",
-  fontSize: "15px",
-  lineHeight: 1.5,
+  fontSize: "14px",
+  color: "#78716c",
+  marginTop: 0,
+  marginBottom: "16px",
 };
 
 const searchBox = {
@@ -374,6 +370,7 @@ const searchBox = {
   borderRadius: "12px",
   border: "1px solid #d6d3d1",
   marginBottom: "18px",
+  boxSizing: "border-box" as const,
 };
 
 const emptyBox = {
@@ -430,6 +427,7 @@ const topNavRow = {
   display: "flex",
   gap: "10px",
   marginBottom: "12px",
+  flexWrap: "wrap" as const,
 };
 
 const navButton = {
