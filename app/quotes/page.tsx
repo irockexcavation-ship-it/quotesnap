@@ -373,7 +373,7 @@ export default function QuotesPage() {
                         onClick={() => updateStatus(quote, "Approved")}
                         style={btnGreen}
                       >
-                        Move to Current Jobs
+                        Approved
                       </button>
 
                       <button
