@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
+
 type QuoteItem = {
   id: string;
   quoteNumber?: string;
@@ -13,7 +15,7 @@ type QuoteItem = {
   startWindow?: string;
   scopeOfWork?: string;
   bannerImage?: string;
-  status?: "Draft" | "Sent" | "Approved" | "Archived";
+  status?: QuoteStatus;
   archivedAt?: string;
 };
 
@@ -22,23 +24,71 @@ export default function ArchivePage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    cleanupDuplicateStorage();
     loadArchivedQuotes();
   }, []);
 
-  function loadArchivedQuotes() {
-    const stored = JSON.parse(
-      localStorage.getItem("quotesnapArchivedQuotes") || "[]"
+  function safeParseQuotes(key: string): QuoteItem[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function uniqueById(items: QuoteItem[]) {
+    const seen = new Set<string>();
+    const unique: QuoteItem[] = [];
+
+    for (const item of items) {
+      const id = String(item.id || "").trim();
+      if (!id || seen.has(id)) continue;
+
+      seen.add(id);
+      unique.push(item);
+    }
+
+    return unique;
+  }
+
+  function cleanupDuplicateStorage() {
+    const active = safeParseQuotes("quotesnapActiveQuotes");
+    const archived = safeParseQuotes("quotesnapArchivedQuotes");
+
+    const cleanedActive = uniqueById(active);
+
+    const activeIds = new Set(cleanedActive.map((quote) => quote.id));
+
+    const cleanedArchived = uniqueById(archived).filter(
+      (quote) => !activeIds.has(quote.id)
     );
+
+    localStorage.setItem(
+      "quotesnapActiveQuotes",
+      JSON.stringify(cleanedActive)
+    );
+
+    localStorage.setItem(
+      "quotesnapArchivedQuotes",
+      JSON.stringify(cleanedArchived)
+    );
+  }
+
+  function loadArchivedQuotes() {
+    const stored = safeParseQuotes("quotesnapArchivedQuotes");
     setQuotes([...stored].reverse());
   }
 
   function saveArchivedQuotes(updatedQuotes: QuoteItem[]) {
-    const storageOrder = [...updatedQuotes].reverse();
+    const storageOrder = uniqueById([...updatedQuotes].reverse());
+
     localStorage.setItem(
       "quotesnapArchivedQuotes",
       JSON.stringify(storageOrder)
     );
-    setQuotes(updatedQuotes);
+
+    setQuotes([...storageOrder].reverse());
   }
 
   function goHome() {
@@ -49,38 +99,53 @@ export default function ArchivePage() {
     window.location.href = "/quotes";
   }
 
+  function goCurrentJobs() {
+    window.location.href = "/current-jobs";
+  }
+
   function openQuote(quote: QuoteItem) {
     localStorage.setItem("quotesnapDraft", JSON.stringify(quote));
     window.location.href = "/preview";
   }
 
-  function restoreQuote(quoteToRestore: QuoteItem) {
-    const archived = JSON.parse(
-      localStorage.getItem("quotesnapArchivedQuotes") || "[]"
-    );
-
-    const active = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
+  function restoreQuote(quoteToRestore: QuoteItem, status: Exclude<QuoteStatus, "Archived">) {
+    const archived = safeParseQuotes("quotesnapArchivedQuotes");
+    const active = safeParseQuotes("quotesnapActiveQuotes");
 
     const updatedArchived = archived.filter(
-      (q: QuoteItem) => q.id !== quoteToRestore.id
+      (quote) => quote.id !== quoteToRestore.id
     );
 
-    active.unshift({
+    const cleanedActive = active.filter(
+      (quote) => quote.id !== quoteToRestore.id
+    );
+
+    const restoredQuote: QuoteItem = {
       ...quoteToRestore,
-      status: "Draft",
+      status,
       archivedAt: undefined,
-    });
+    };
+
+    cleanedActive.unshift(restoredQuote);
 
     localStorage.setItem(
       "quotesnapArchivedQuotes",
-      JSON.stringify(updatedArchived)
+      JSON.stringify(uniqueById(updatedArchived))
     );
 
-    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(active));
+    localStorage.setItem(
+      "quotesnapActiveQuotes",
+      JSON.stringify(uniqueById(cleanedActive))
+    );
 
-    setQuotes([...updatedArchived].reverse());
+    setQuotes([...uniqueById(updatedArchived)].reverse());
+
+    if (status === "Approved") {
+      window.location.href = "/current-jobs";
+      return;
+    }
+
+    window.location.href = "/quotes";
   }
 
   function deleteArchivedQuote(quoteToDelete: QuoteItem) {
@@ -92,12 +157,20 @@ export default function ArchivePage() {
 
     if (!confirmed) return;
 
-    const updated = quotes.filter((q) => q.id !== quoteToDelete.id);
+    const updated = quotes.filter((quote) => quote.id !== quoteToDelete.id);
     saveArchivedQuotes(updated);
   }
 
-  const filtered = quotes.filter((q) =>
-    `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
+  function removeDuplicatesNow() {
+    cleanupDuplicateStorage();
+    loadArchivedQuotes();
+    alert("Duplicate cleanup complete.");
+  }
+
+  const filtered = quotes.filter((quote) =>
+    `${quote.clientName || ""} ${quote.quoteNumber || ""} ${
+      quote.projectAddress || ""
+    }`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
@@ -120,15 +193,30 @@ export default function ArchivePage() {
           <button onClick={goQuotes} style={navButton}>
             Quotes
           </button>
+
+          <button onClick={goCurrentJobs} style={navButton}>
+            Current Jobs
+          </button>
         </div>
 
         <div style={card}>
-          <h1 style={title}>Archive</h1>
+          <div style={headerRow}>
+            <div>
+              <h1 style={title}>Archive</h1>
+              <p style={subtitle}>
+                Completed, archived, and old quotes live here.
+              </p>
+            </div>
+
+            <button onClick={removeDuplicatesNow} style={cleanupButton}>
+              Clean Duplicates
+            </button>
+          </div>
 
           <input
             placeholder="Search archived quotes"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             style={searchBox}
           />
 
@@ -174,10 +262,17 @@ export default function ArchivePage() {
                     </button>
 
                     <button
-                      onClick={() => restoreQuote(quote)}
+                      onClick={() => restoreQuote(quote, "Draft")}
                       style={btnOrange}
                     >
-                      Restore
+                      Restore to Quotes
+                    </button>
+
+                    <button
+                      onClick={() => restoreQuote(quote, "Approved")}
+                      style={btnGreen}
+                    >
+                      Restore to Current Jobs
                     </button>
 
                     <button
@@ -204,10 +299,25 @@ const card = {
   border: "1px solid #e7e5e4",
 };
 
+const headerRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "16px",
+  flexWrap: "wrap" as const,
+  marginBottom: "16px",
+};
+
 const title = {
   fontSize: "30px",
   fontWeight: 800,
-  marginBottom: "12px",
+  margin: "0 0 4px 0",
+};
+
+const subtitle = {
+  margin: 0,
+  color: "#78716c",
+  fontSize: "14px",
 };
 
 const searchBox = {
@@ -216,6 +326,7 @@ const searchBox = {
   borderRadius: "12px",
   border: "1px solid #d6d3d1",
   marginBottom: "18px",
+  boxSizing: "border-box" as const,
 };
 
 const emptyBox = {
@@ -281,6 +392,7 @@ const topNavRow = {
   display: "flex",
   gap: "10px",
   marginBottom: "12px",
+  flexWrap: "wrap" as const,
 };
 
 const navButton = {
@@ -289,6 +401,16 @@ const navButton = {
   border: "1px solid #d6d3d1",
   background: "#fff",
   cursor: "pointer",
+};
+
+const cleanupButton = {
+  padding: "10px 14px",
+  borderRadius: "10px",
+  border: "1px solid #d6d3d1",
+  background: "#fafaf9",
+  color: "#44403c",
+  cursor: "pointer",
+  fontWeight: "bold" as const,
 };
 
 const btnDark = {
@@ -302,6 +424,15 @@ const btnDark = {
 
 const btnOrange = {
   background: "#f97316",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const btnGreen = {
+  background: "#15803d",
   color: "#fff",
   border: "none",
   borderRadius: "10px",
