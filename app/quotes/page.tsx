@@ -60,20 +60,31 @@ export default function QuotesPage() {
   }
 
   function loadQuotes() {
-    const stored = JSON.parse(
+    const stored: QuoteItem[] = JSON.parse(
       localStorage.getItem("quotesnapActiveQuotes") || "[]"
     );
 
-    setQuotes([...stored].reverse());
+    setQuotes(
+      [...stored]
+        .filter((q) => q.status !== "Approved")
+        .reverse()
+    );
   }
 
   function saveActiveQuotes(updatedQuotes: QuoteItem[]) {
+    const existingActive: QuoteItem[] = JSON.parse(
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
+    );
+
+    const approvedJobs = existingActive.filter((q) => q.status === "Approved");
     const storageOrder = [...updatedQuotes].reverse();
+
     localStorage.setItem(
       "quotesnapActiveQuotes",
-      JSON.stringify(storageOrder)
+      JSON.stringify([...storageOrder, ...approvedJobs])
     );
-    setQuotes(updatedQuotes);
+
+    setQuotes(updatedQuotes.filter((q) => q.status !== "Approved"));
   }
 
   function goHome() {
@@ -82,6 +93,10 @@ export default function QuotesPage() {
 
   function goArchive() {
     window.location.href = "/archive";
+  }
+
+  function goCurrentJobs() {
+    window.location.href = "/current-jobs";
   }
 
   function openQuote(quote: QuoteItem) {
@@ -118,12 +133,12 @@ export default function QuotesPage() {
     quoteToUpdate: QuoteItem,
     status: QuoteItem["status"]
   ) {
-    if (status === "Archived") {
-      const active = JSON.parse(
-        localStorage.getItem("quotesnapActiveQuotes") || "[]"
-      );
+    const active: QuoteItem[] = JSON.parse(
+      localStorage.getItem("quotesnapActiveQuotes") || "[]"
+    );
 
-      const archived = JSON.parse(
+    if (status === "Archived") {
+      const archived: QuoteItem[] = JSON.parse(
         localStorage.getItem("quotesnapArchivedQuotes") || "[]"
       );
 
@@ -131,11 +146,15 @@ export default function QuotesPage() {
         (q: QuoteItem) => q.id !== quoteToUpdate.id
       );
 
-      archived.unshift({
+      const archivedQuote = {
         ...quoteToUpdate,
-        status: "Archived",
+        status: "Archived" as const,
         archivedAt: new Date().toISOString(),
-      });
+      };
+
+      const archivedWithoutDuplicate = archived.filter(
+        (q: QuoteItem) => q.id !== quoteToUpdate.id
+      );
 
       localStorage.setItem(
         "quotesnapActiveQuotes",
@@ -144,18 +163,37 @@ export default function QuotesPage() {
 
       localStorage.setItem(
         "quotesnapArchivedQuotes",
-        JSON.stringify(archived)
+        JSON.stringify([archivedQuote, ...archivedWithoutDuplicate])
       );
 
-      setQuotes([...updatedActive].reverse());
+      setQuotes(
+        [...updatedActive]
+          .filter((q) => q.status !== "Approved")
+          .reverse()
+      );
       return;
     }
 
-    const updated = quotes.map((q) =>
-      q.id === quoteToUpdate.id ? { ...q, status } : q
+    const updatedActive = active.map((q) =>
+      q.id === quoteToUpdate.id
+        ? {
+            ...q,
+            status,
+            approvedAt: status === "Approved" ? new Date().toISOString() : q.approvedAt,
+          }
+        : q
     );
 
-    saveActiveQuotes(updated);
+    localStorage.setItem(
+      "quotesnapActiveQuotes",
+      JSON.stringify(updatedActive)
+    );
+
+    setQuotes(
+      [...updatedActive]
+        .filter((q) => q.status !== "Approved")
+        .reverse()
+    );
   }
 
   function statusColor(status: QuoteItem["status"]) {
@@ -192,10 +230,17 @@ export default function QuotesPage() {
           <button onClick={goArchive} style={navButton}>
             Archive
           </button>
+
+          <button onClick={goCurrentJobs} style={navButton}>
+            Current Jobs
+          </button>
         </div>
 
         <div style={card}>
           <h1 style={title}>Quotes</h1>
+          <p style={subtitle}>
+            Draft and sent quotes live here. Approved quotes move to Current Jobs.
+          </p>
 
           <input
             placeholder="Search client, address, or quote #"
@@ -205,7 +250,7 @@ export default function QuotesPage() {
           />
 
           {filtered.length === 0 ? (
-            <div style={emptyBox}>No active quotes found.</div>
+            <div style={emptyBox}>No draft or sent quotes found.</div>
           ) : (
             <div style={{ display: "grid", gap: "14px" }}>
               {filtered.map((quote) => {
@@ -273,9 +318,9 @@ export default function QuotesPage() {
 
                       <button
                         onClick={() => updateStatus(quote, "Approved")}
-                        style={btnLight}
+                        style={btnGreen}
                       >
-                        Approved
+                        Move to Current Jobs
                       </button>
 
                       <button
@@ -314,6 +359,13 @@ const title = {
   fontSize: "30px",
   fontWeight: 800,
   marginBottom: "12px",
+};
+
+const subtitle = {
+  margin: "-4px 0 16px 0",
+  color: "#57534e",
+  fontSize: "15px",
+  lineHeight: 1.5,
 };
 
 const searchBox = {
@@ -410,6 +462,15 @@ const btnLight = {
   background: "#fff7ed",
   color: "#9a3412",
   border: "1px solid #fdba74",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const btnGreen = {
+  background: "#15803d",
+  color: "#fff",
+  border: "none",
   borderRadius: "10px",
   padding: "8px 12px",
   cursor: "pointer",
