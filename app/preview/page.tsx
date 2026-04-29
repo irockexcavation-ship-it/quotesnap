@@ -43,62 +43,6 @@ export default function PreviewPage() {
     return `${client}_${quoteNum}_photo.jpg`;
   }
 
-  function splitOverviewAndScope(fullText: string) {
-    if (!fullText) {
-      return {
-        overview: "",
-        scope: "",
-      };
-    }
-
-    const lines = fullText
-      .split("\n")
-      .map((line: string) => line.trim())
-      .filter((line: string) => line !== "");
-
-    if (lines.length <= 2) {
-      return {
-        overview: fullText,
-        scope: "",
-      };
-    }
-
-    const overviewLines: string[] = [];
-    const scopeLines: string[] = [];
-
-    let foundScopeStart = false;
-
-    for (const line of lines) {
-      const looksLikeScopeLine =
-        line.startsWith("•") ||
-        /^[-*]\s/.test(line) ||
-        /^[A-Z][A-Za-z\s&/]+:$/.test(line) ||
-        /^[A-Z][A-Za-z\s&/]+$/.test(line);
-
-      if (!foundScopeStart && looksLikeScopeLine) {
-        foundScopeStart = true;
-      }
-
-      if (foundScopeStart) {
-        scopeLines.push(line);
-      } else {
-        overviewLines.push(line);
-      }
-    }
-
-    if (scopeLines.length === 0) {
-      return {
-        overview: fullText,
-        scope: "",
-      };
-    }
-
-    return {
-      overview: overviewLines.join("\n"),
-      scope: scopeLines.join("\n"),
-    };
-  }
-
   async function exportPDF() {
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -111,8 +55,7 @@ export default function PreviewPage() {
     const margin = 18;
     const contentWidth = pageWidth - margin * 2;
     const lineHeight = 6.5;
-
-    const { overview, scope } = splitOverviewAndScope(String(quote.scopeOfWork || ""));
+    const scope = String(quote.scopeOfWork || "");
 
     let y = 20;
 
@@ -241,8 +184,7 @@ export default function PreviewPage() {
     }
 
     addSection("Estimated Start Window", String(quote.startWindow || "-"));
-    addSection("Project Overview", overview || String(quote.scopeOfWork || "-"));
-    addSection("Scope of Work", scope);
+    addSection("Scope of Work", scope || "-");
 
     addSection(
       "Next Steps",
@@ -342,7 +284,7 @@ export default function PreviewPage() {
     window.location.href = "/";
   }
 
-  const { overview, scope } = splitOverviewAndScope(String(quote.scopeOfWork || ""));
+  const scope = String(quote.scopeOfWork || "");
 
   return (
     <main
@@ -550,20 +492,12 @@ export default function PreviewPage() {
           </div>
 
           <SectionCard title="Estimated Start Window">
-            <p style={bodyText}>{quote.startWindow}</p>
+            <p style={bodyText}>{quote.startWindow || "-"}</p>
           </SectionCard>
 
-          <SectionCard title="Project Overview">
-            <p style={{ ...bodyText, whiteSpace: "pre-line" }}>
-              {overview || quote.scopeOfWork}
-            </p>
+          <SectionCard title="Scope of Work">
+            <p style={{ ...bodyText, whiteSpace: "pre-line" }}>{scope || "-"}</p>
           </SectionCard>
-
-          {scope ? (
-            <SectionCard title="Scope of Work">
-              <p style={{ ...bodyText, whiteSpace: "pre-line" }}>{scope}</p>
-            </SectionCard>
-          ) : null}
 
           <SectionCard title="Next Steps">
             <p style={bodyText}>

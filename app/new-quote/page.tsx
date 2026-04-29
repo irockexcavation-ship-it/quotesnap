@@ -23,6 +23,9 @@ type QuoteItem = {
 };
 
 export default function NewQuotePage() {
+  const [editingId, setEditingId] = useState("");
+  const [editingStatus, setEditingStatus] = useState<QuoteItem["status"]>("Draft");
+
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [contactInfo, setContactInfo] = useState("");
@@ -41,7 +44,17 @@ export default function NewQuotePage() {
     const editData = localStorage.getItem("quotesnapEditDraft");
 
     if (editData) {
-      const parsed = JSON.parse(editData);
+      const parsed: QuoteItem = JSON.parse(editData);
+
+      const isDuplicate = !parsed.quoteNumber;
+
+      if (!isDuplicate && parsed.id) {
+        setEditingId(parsed.id);
+        setEditingStatus(parsed.status || "Draft");
+      } else {
+        setEditingId("");
+        setEditingStatus("Draft");
+      }
 
       setClientName(parsed.clientName || "");
       setProjectAddress(parsed.projectAddress || "");
@@ -242,11 +255,8 @@ export default function NewQuotePage() {
   }
 
   function handlePreview() {
-    const editData = localStorage.getItem("quotesnapEditDraft");
-    const existingEdit = editData ? JSON.parse(editData) : null;
-
     const quoteData: QuoteItem = {
-      id: existingEdit?.id || Date.now().toString(),
+      id: editingId || Date.now().toString(),
       quoteNumber,
       clientName,
       projectAddress,
@@ -256,7 +266,7 @@ export default function NewQuotePage() {
       startWindow,
       scopeOfWork,
       bannerImage,
-      status: existingEdit?.status || "Draft",
+      status: editingStatus || "Draft",
     };
 
     try {
@@ -272,13 +282,21 @@ export default function NewQuotePage() {
       localStorage.getItem("quotesnapActiveQuotes") || "[]"
     );
 
-    const updatedQuotes = activeQuotes.filter((q) => q.id !== quoteData.id);
-    updatedQuotes.unshift(quoteData);
-
-    localStorage.setItem(
-      "quotesnapActiveQuotes",
-      JSON.stringify(updatedQuotes)
+    const archivedQuotes: QuoteItem[] = JSON.parse(
+      localStorage.getItem("quotesnapArchivedQuotes") || "[]"
     );
+
+    const nextActiveQuotes = activeQuotes.filter((q) => q.id !== quoteData.id);
+    const nextArchivedQuotes = archivedQuotes.filter((q) => q.id !== quoteData.id);
+
+    if (quoteData.status === "Archived") {
+      nextArchivedQuotes.unshift(quoteData);
+    } else {
+      nextActiveQuotes.unshift(quoteData);
+    }
+
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(nextActiveQuotes));
+    localStorage.setItem("quotesnapArchivedQuotes", JSON.stringify(nextArchivedQuotes));
 
     window.location.href = "/preview";
   }
@@ -288,6 +306,7 @@ export default function NewQuotePage() {
   }
 
   const recentClients = savedClients.slice(0, 6);
+  const isEditing = Boolean(editingId);
 
   return (
     <main
@@ -329,7 +348,7 @@ export default function NewQuotePage() {
             color: "#1c1917",
           }}
         >
-          New Quote
+          {isEditing ? "Edit Quote" : "New Quote"}
         </h1>
 
         <p
@@ -339,7 +358,9 @@ export default function NewQuotePage() {
             marginBottom: "30px",
           }}
         >
-          Enter the project details below to build a quote.
+          {isEditing
+            ? "Update the project details below and save the existing quote."
+            : "Enter the project details below to build a quote."}
         </p>
 
         <div
@@ -585,7 +606,7 @@ export default function NewQuotePage() {
                 cursor: "pointer",
               }}
             >
-              Preview Quote
+              {isEditing ? "Update Quote" : "Preview Quote"}
             </button>
           </div>
         </div>
