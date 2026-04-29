@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-type QuoteStatus = "Draft" | "Sent" | "Approved" | "Completed" | "Archived";
+type QuoteStatus =
+  | "Draft"
+  | "Sent"
+  | "Approved"
+  | "Completed"
+  | "Archived";
+
+type PaymentStatus = "Paid" | "Unpaid";
 
 type QuoteItem = {
   id: string;
@@ -16,6 +23,7 @@ type QuoteItem = {
   scopeOfWork?: string;
   bannerImage?: string;
   status?: QuoteStatus;
+  paymentStatus?: PaymentStatus;
   archivedAt?: string;
   completedAt?: string;
   sentAt?: string;
@@ -60,11 +68,10 @@ export default function ArchivePage() {
     const archived = safeParseQuotes("quotesnapArchivedQuotes");
 
     const cleanedActive = uniqueById(active);
-
-    const activeIds = new Set(cleanedActive.map((quote) => quote.id));
+    const activeIds = new Set(cleanedActive.map((q) => q.id));
 
     const cleanedArchived = uniqueById(archived).filter(
-      (quote) => !activeIds.has(quote.id)
+      (q) => !activeIds.has(q.id)
     );
 
     localStorage.setItem(
@@ -81,17 +88,6 @@ export default function ArchivePage() {
   function loadArchivedQuotes() {
     const stored = safeParseQuotes("quotesnapArchivedQuotes");
     setQuotes([...stored].reverse());
-  }
-
-  function saveArchivedQuotes(updatedQuotes: QuoteItem[]) {
-    const storageOrder = uniqueById([...updatedQuotes].reverse());
-
-    localStorage.setItem(
-      "quotesnapArchivedQuotes",
-      JSON.stringify(storageOrder)
-    );
-
-    setQuotes([...storageOrder].reverse());
   }
 
   function goHome() {
@@ -111,39 +107,40 @@ export default function ArchivePage() {
     window.location.href = "/preview";
   }
 
-  function restoreQuote(quoteToRestore: QuoteItem, status: Exclude<QuoteStatus, "Archived" | "Completed">) {
+  function restoreQuote(
+    quoteToRestore: QuoteItem,
+    status: "Draft" | "Approved"
+  ) {
     const archived = safeParseQuotes("quotesnapArchivedQuotes");
     const active = safeParseQuotes("quotesnapActiveQuotes");
 
     const updatedArchived = archived.filter(
-      (quote) => quote.id !== quoteToRestore.id
+      (q) => q.id !== quoteToRestore.id
     );
 
     const cleanedActive = active.filter(
-      (quote) => quote.id !== quoteToRestore.id
+      (q) => q.id !== quoteToRestore.id
     );
 
-    const restoredQuote: QuoteItem = {
+    cleanedActive.unshift({
       ...quoteToRestore,
       status,
       archivedAt: undefined,
       completedAt: undefined,
       archiveReason: undefined,
-    };
-
-    cleanedActive.unshift(restoredQuote);
+      paymentStatus:
+        quoteToRestore.paymentStatus || "Unpaid",
+    });
 
     localStorage.setItem(
       "quotesnapArchivedQuotes",
-      JSON.stringify(uniqueById(updatedArchived))
+      JSON.stringify(updatedArchived)
     );
 
     localStorage.setItem(
       "quotesnapActiveQuotes",
-      JSON.stringify(uniqueById(cleanedActive))
+      JSON.stringify(cleanedActive)
     );
-
-    setQuotes([...uniqueById(updatedArchived)].reverse());
 
     if (status === "Approved") {
       window.location.href = "/current-jobs";
@@ -155,66 +152,54 @@ export default function ArchivePage() {
 
   function deleteArchivedQuote(quoteToDelete: QuoteItem) {
     const confirmed = window.confirm(
-      `Permanently delete archived quote for ${
+      `Delete archived quote for ${
         quoteToDelete.clientName || "this client"
-      }?`
+      } forever?`
     );
 
     if (!confirmed) return;
 
-    const updated = quotes.filter((quote) => quote.id !== quoteToDelete.id);
-    saveArchivedQuotes(updated);
+    const updated = quotes.filter(
+      (q) => q.id !== quoteToDelete.id
+    );
+
+    localStorage.setItem(
+      "quotesnapArchivedQuotes",
+      JSON.stringify(updated.reverse())
+    );
+
+    setQuotes(updated);
   }
 
-  function removeDuplicatesNow() {
-    cleanupDuplicateStorage();
-    loadArchivedQuotes();
-    alert("Duplicate cleanup complete.");
-  }
+  function getLabel(quote: QuoteItem) {
+    if (quote.status === "Completed") return "Completed Job";
+    if (
+      quote.archiveReason ===
+      "Auto-archived after 30 days sent"
+    )
+      return "Old Sent Quote";
 
-  function getArchiveLabel(quote: QuoteItem) {
-    if (quote.status === "Completed" || quote.completedAt) return "Completed Job";
-    if (quote.archiveReason === "Auto-archived after 30 days sent") return "Old Sent Quote";
     return "Archived Quote";
   }
 
-  function getArchivePillStyle(quote: QuoteItem) {
-    if (quote.status === "Completed" || quote.completedAt) {
-      return {
-        ...archivedPill,
-        background: "#dcfce7",
-        color: "#166534",
-        border: "1px solid #86efac",
-      };
+  function getBadge(quote: QuoteItem) {
+    if (quote.status === "Completed") {
+      return completedBadge;
     }
 
-    if (quote.archiveReason === "Auto-archived after 30 days sent") {
-      return {
-        ...archivedPill,
-        background: "#dbeafe",
-        color: "#1d4ed8",
-        border: "1px solid #93c5fd",
-      };
+    if (
+      quote.archiveReason ===
+      "Auto-archived after 30 days sent"
+    ) {
+      return sentBadge;
     }
 
-    return archivedPill;
+    return archivedBadge;
   }
 
-  function getArchiveDateLabel(quote: QuoteItem) {
-    if (quote.status === "Completed" || quote.completedAt) {
-      return `Completed: ${quote.completedAt ? new Date(quote.completedAt).toLocaleDateString() : "Unknown"}`;
-    }
-
-    if (quote.archiveReason === "Auto-archived after 30 days sent") {
-      return `Auto-archived: ${quote.archivedAt ? new Date(quote.archivedAt).toLocaleDateString() : "Unknown"}`;
-    }
-
-    return `Archived: ${quote.archivedAt ? new Date(quote.archivedAt).toLocaleDateString() : "Unknown"}`;
-  }
-
-  const filtered = quotes.filter((quote) =>
-    `${quote.clientName || ""} ${quote.quoteNumber || ""} ${
-      quote.projectAddress || ""
+  const filtered = quotes.filter((q) =>
+    `${q.clientName || ""} ${q.quoteNumber || ""} ${
+      q.projectAddress || ""
     }`
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -224,112 +209,162 @@ export default function ArchivePage() {
     <main
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #f5f5f4 0%, #ede9e7 100%)",
+        background:
+          "linear-gradient(180deg,#f5f5f4 0%,#ede9e7 100%)",
         padding: "24px 18px 40px",
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <div style={{ maxWidth: "860px", margin: "0 auto" }}>
-        <div style={topNavRow}>
-          <button onClick={goHome} style={navButton}>
+      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+        <div style={topNav}>
+          <button onClick={goHome} style={navBtn}>
             Home
           </button>
 
-          <button onClick={goQuotes} style={navButton}>
+          <button onClick={goQuotes} style={navBtn}>
             Quotes
           </button>
 
-          <button onClick={goCurrentJobs} style={navButton}>
+          <button
+            onClick={goCurrentJobs}
+            style={navBtn}
+          >
             Current Jobs
           </button>
         </div>
 
         <div style={card}>
-          <div style={headerRow}>
-            <div>
-              <h1 style={title}>Archive</h1>
-              <p style={subtitle}>
-                Completed jobs, old sent quotes, and manually archived quotes live here.
-              </p>
-            </div>
-
-            <button onClick={removeDuplicatesNow} style={cleanupButton}>
-              Clean Duplicates
-            </button>
-          </div>
+          <h1 style={title}>Archive</h1>
 
           <input
-            placeholder="Search archived quotes"
+            placeholder="Search archive"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
             style={searchBox}
           />
 
           {filtered.length === 0 ? (
-            <div style={emptyBox}>No archived quotes found.</div>
+            <div style={emptyBox}>
+              No archived quotes found.
+            </div>
           ) : (
             <div style={{ display: "grid", gap: "14px" }}>
-              {filtered.map((quote) => (
-                <div key={quote.id} style={quoteCard}>
-                  <div style={rowTop}>
-                    <div
-                      onClick={() => openQuote(quote)}
-                      style={{ flex: 1, cursor: "pointer" }}
-                    >
-                      <div style={clientName}>
-                        {quote.clientName || "Unnamed Client"}
+              {filtered.map((quote) => {
+                const paid =
+                  quote.paymentStatus === "Paid";
+
+                return (
+                  <div
+                    key={quote.id}
+                    style={quoteCard}
+                  >
+                    <div style={rowTop}>
+                      <div
+                        onClick={() =>
+                          openQuote(quote)
+                        }
+                        style={{
+                          flex: 1,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={clientName}>
+                          {quote.clientName ||
+                            "Unnamed Client"}
+                        </div>
+
+                        <div style={meta}>
+                          {quote.quoteNumber ||
+                            "No Quote #"}{" "}
+                          •{" "}
+                          {quote.quoteDate ||
+                            "No Date"}{" "}
+                          •{" "}
+                          {quote.projectTotal ||
+                            "$0"}
+                        </div>
+
+                        <div style={address}>
+                          {quote.projectAddress ||
+                            ""}
+                        </div>
                       </div>
 
-                      <div style={meta}>
-                        {quote.quoteNumber || "No Quote #"} •{" "}
-                        {quote.quoteDate || "No Date"} •{" "}
-                        {quote.projectTotal || "$0"}
-                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gap: "8px",
+                          justifyItems: "end",
+                        }}
+                      >
+                        <span style={getBadge(quote)}>
+                          {getLabel(quote)}
+                        </span>
 
-                      <div style={address}>
-                        {quote.projectAddress || ""}
+                        <span
+                          style={
+                            paid
+                              ? paidBadge
+                              : unpaidBadge
+                          }
+                        >
+                          {paid
+                            ? "Paid"
+                            : "Unpaid"}
+                        </span>
                       </div>
-
-                      <div style={archivedMeta}>
-                        {getArchiveDateLabel(quote)}
-                      </div>
-
-                      {quote.archiveReason ? (
-                        <div style={archiveReasonStyle}>{quote.archiveReason}</div>
-                      ) : null}
                     </div>
 
-                    <div style={getArchivePillStyle(quote)}>{getArchiveLabel(quote)}</div>
+                    <div style={buttonRow}>
+                      <button
+                        onClick={() =>
+                          openQuote(quote)
+                        }
+                        style={btnDark}
+                      >
+                        Open
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          restoreQuote(
+                            quote,
+                            "Draft"
+                          )
+                        }
+                        style={btnOrange}
+                      >
+                        Restore Quotes
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          restoreQuote(
+                            quote,
+                            "Approved"
+                          )
+                        }
+                        style={btnGreen}
+                      >
+                        Restore Jobs
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          deleteArchivedQuote(
+                            quote
+                          )
+                        }
+                        style={btnDelete}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-
-                  <div style={buttonRow}>
-                    <button onClick={() => openQuote(quote)} style={btnDark}>
-                      Open
-                    </button>
-
-                    <button
-                      onClick={() => restoreQuote(quote, "Draft")}
-                      style={btnOrange}
-                    >
-                      Restore to Quotes
-                    </button>
-
-                    <button
-                      onClick={() => restoreQuote(quote, "Approved")}
-                      style={btnGreen}
-                    >
-                      Restore to Current Jobs
-                    </button>
-
-                    <button
-                      onClick={() => deleteArchivedQuote(quote)}
-                      style={btnDelete}
-                    >
-                      Delete Forever
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -345,25 +380,10 @@ const card = {
   border: "1px solid #e7e5e4",
 };
 
-const headerRow = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  gap: "16px",
-  flexWrap: "wrap" as const,
-  marginBottom: "16px",
-};
-
 const title = {
   fontSize: "30px",
   fontWeight: 800,
-  margin: "0 0 4px 0",
-};
-
-const subtitle = {
-  margin: 0,
-  color: "#78716c",
-  fontSize: "14px",
+  marginBottom: "14px",
 };
 
 const searchBox = {
@@ -372,7 +392,6 @@ const searchBox = {
   borderRadius: "12px",
   border: "1px solid #d6d3d1",
   marginBottom: "18px",
-  boxSizing: "border-box" as const,
 };
 
 const emptyBox = {
@@ -391,8 +410,8 @@ const quoteCard = {
 const rowTop = {
   display: "flex",
   justifyContent: "space-between",
-  marginBottom: "12px",
   gap: "12px",
+  marginBottom: "14px",
 };
 
 const clientName = {
@@ -410,44 +429,20 @@ const address = {
   color: "#78716c",
 };
 
-const archivedMeta = {
-  fontSize: "12px",
-  color: "#a8a29e",
-  marginTop: "6px",
-};
-
-const archiveReasonStyle = {
-  fontSize: "12px",
-  color: "#78716c",
-  marginTop: "4px",
-};
-
-const archivedPill = {
-  padding: "6px 10px",
-  borderRadius: "999px",
-  fontSize: "12px",
-  fontWeight: 800,
-  whiteSpace: "nowrap" as const,
-  height: "fit-content",
-  background: "#e7e5e4",
-  color: "#44403c",
-  border: "1px solid #d6d3d1",
-};
-
 const buttonRow = {
   display: "flex",
-  flexWrap: "wrap" as const,
   gap: "8px",
+  flexWrap: "wrap" as const,
 };
 
-const topNavRow = {
+const topNav = {
   display: "flex",
   gap: "10px",
   marginBottom: "12px",
   flexWrap: "wrap" as const,
 };
 
-const navButton = {
+const navBtn = {
   padding: "10px 14px",
   borderRadius: "10px",
   border: "1px solid #d6d3d1",
@@ -455,14 +450,49 @@ const navButton = {
   cursor: "pointer",
 };
 
-const cleanupButton = {
-  padding: "10px 14px",
-  borderRadius: "10px",
-  border: "1px solid #d6d3d1",
-  background: "#fafaf9",
+const archivedBadge = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#e7e5e4",
   color: "#44403c",
-  cursor: "pointer",
-  fontWeight: "bold" as const,
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const completedBadge = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#dcfce7",
+  color: "#166534",
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const sentBadge = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#dbeafe",
+  color: "#1d4ed8",
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const paidBadge = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#dcfce7",
+  color: "#166534",
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const unpaidBadge = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#fee2e2",
+  color: "#991b1b",
+  fontSize: "12px",
+  fontWeight: 800,
 };
 
 const btnDark = {

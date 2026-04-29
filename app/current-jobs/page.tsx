@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type QuoteStatus = "Draft" | "Sent" | "Approved" | "Completed" | "Archived";
+type QuoteStatus =
+  | "Draft"
+  | "Sent"
+  | "Approved"
+  | "Completed"
+  | "Archived";
+
+type PaymentStatus = "Paid" | "Unpaid";
 
 type QuoteItem = {
   id: string;
@@ -16,6 +23,7 @@ type QuoteItem = {
   scopeOfWork?: string;
   bannerImage?: string;
   status?: QuoteStatus;
+  paymentStatus?: PaymentStatus;
   approvedAt?: string;
   completedAt?: string;
   sentAt?: string;
@@ -39,11 +47,21 @@ export default function CurrentJobsPage() {
       localStorage.getItem(ACTIVE_KEY) || "[]"
     );
 
-    setJobs(activeQuotes.filter((quote) => quote.status === "Approved"));
+    const approvedJobs = activeQuotes
+      .filter((quote) => quote.status === "Approved")
+      .map((quote) => ({
+        ...quote,
+        paymentStatus: quote.paymentStatus || "Unpaid",
+      }));
+
+    setJobs(approvedJobs);
   }
 
   const totalOpenValue = useMemo(() => {
-    return jobs.reduce((sum, job) => sum + currencyToNumber(job.projectTotal || ""), 0);
+    return jobs.reduce(
+      (sum, job) => sum + currencyToNumber(job.projectTotal || ""),
+      0
+    );
   }, [jobs]);
 
   function currencyToNumber(value: string) {
@@ -65,6 +83,19 @@ export default function CurrentJobsPage() {
     window.location.href = "/preview";
   }
 
+  function updatePayment(jobId: string, paymentStatus: PaymentStatus) {
+    const activeQuotes: QuoteItem[] = JSON.parse(
+      localStorage.getItem(ACTIVE_KEY) || "[]"
+    );
+
+    const updated = activeQuotes.map((quote) =>
+      quote.id === jobId ? { ...quote, paymentStatus } : quote
+    );
+
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(updated));
+    loadJobs();
+  }
+
   function completeJob(jobId: string) {
     const activeQuotes: QuoteItem[] = JSON.parse(
       localStorage.getItem(ACTIVE_KEY) || "[]"
@@ -79,19 +110,36 @@ export default function CurrentJobsPage() {
 
     const completedJob: QuoteItem = {
       ...job,
+      paymentStatus: job.paymentStatus || "Unpaid",
       status: "Completed",
       completedAt: new Date().toISOString(),
       archivedAt: new Date().toISOString(),
       archiveReason: "Completed job",
     };
 
-    const remainingActive = activeQuotes.filter((quote) => quote.id !== jobId);
-    const archiveWithoutDuplicate = archivedQuotes.filter((quote) => quote.id !== jobId);
+    const remainingActive = activeQuotes.filter(
+      (quote) => quote.id !== jobId
+    );
 
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(remainingActive));
-    localStorage.setItem(ARCHIVE_KEY, JSON.stringify([completedJob, ...archiveWithoutDuplicate]));
+    const archiveWithoutDuplicate = archivedQuotes.filter(
+      (quote) => quote.id !== jobId
+    );
 
-    setJobs(remainingActive.filter((quote) => quote.status === "Approved"));
+    localStorage.setItem(
+      ACTIVE_KEY,
+      JSON.stringify(remainingActive)
+    );
+
+    localStorage.setItem(
+      ARCHIVE_KEY,
+      JSON.stringify([completedJob, ...archiveWithoutDuplicate])
+    );
+
+    setJobs(
+      remainingActive.filter(
+        (quote) => quote.status === "Approved"
+      )
+    );
   }
 
   function sendBackToQuotes(jobId: string) {
@@ -99,12 +147,14 @@ export default function CurrentJobsPage() {
       localStorage.getItem(ACTIVE_KEY) || "[]"
     );
 
-    const updatedQuotes = activeQuotes.map((quote) =>
-      quote.id === jobId ? { ...quote, status: "Sent" as QuoteStatus } : quote
+    const updated = activeQuotes.map((quote) =>
+      quote.id === jobId
+        ? { ...quote, status: "Sent" as QuoteStatus }
+        : quote
     );
 
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(updatedQuotes));
-    setJobs(updatedQuotes.filter((quote) => quote.status === "Approved"));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(updated));
+    loadJobs();
   }
 
   function goHome() {
@@ -133,10 +183,19 @@ export default function CurrentJobsPage() {
             marginBottom: "22px",
           }}
         >
-          <button type="button" onClick={goHome} style={topButton("#e7e5e4", "#1c1917")}>
+          <button
+            type="button"
+            onClick={goHome}
+            style={topButton("#e7e5e4", "#1c1917")}
+          >
             Home
           </button>
-          <button type="button" onClick={goQuotes} style={topButton("#1c1917", "#ffffff")}>
+
+          <button
+            type="button"
+            onClick={goQuotes}
+            style={topButton("#1c1917", "#ffffff")}
+          >
             Quotes
           </button>
         </div>
@@ -157,13 +216,19 @@ export default function CurrentJobsPage() {
                 fontSize: "36px",
                 margin: "0 0 8px",
                 color: "#1c1917",
-                letterSpacing: "-0.02em",
               }}
             >
               Current Jobs
             </h1>
-            <p style={{ margin: 0, color: "#57534e", fontSize: "17px" }}>
-              Approved quotes waiting in the work queue.
+
+            <p
+              style={{
+                margin: 0,
+                color: "#57534e",
+                fontSize: "17px",
+              }}
+            >
+              Approved quotes waiting in queue.
             </p>
           </div>
 
@@ -175,13 +240,25 @@ export default function CurrentJobsPage() {
               padding: "14px 18px",
               minWidth: "190px",
               textAlign: "right",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
             }}
           >
-            <div style={{ color: "#78716c", fontSize: "13px", fontWeight: 700 }}>
+            <div
+              style={{
+                color: "#78716c",
+                fontSize: "13px",
+                fontWeight: 700,
+              }}
+            >
               OPEN JOB VALUE
             </div>
-            <div style={{ color: "#1c1917", fontSize: "26px", fontWeight: 800 }}>
+
+            <div
+              style={{
+                color: "#1c1917",
+                fontSize: "26px",
+                fontWeight: 800,
+              }}
+            >
               {formatMoney(totalOpenValue)}
             </div>
           </div>
@@ -195,85 +272,166 @@ export default function CurrentJobsPage() {
               borderRadius: "16px",
               padding: "28px",
               color: "#57534e",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
             }}
           >
-            No approved jobs in the queue. Either you’re caught up, or the app is judging your pipeline quietly.
+            No approved jobs in queue.
           </div>
         ) : (
           <div style={{ display: "grid", gap: "16px" }}>
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid #e7e5e4",
-                  borderRadius: "16px",
-                  padding: "20px",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-                }}
-              >
+            {jobs.map((job) => {
+              const paid = job.paymentStatus === "Paid";
+
+              return (
                 <div
+                  key={job.id}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "16px",
-                    flexWrap: "wrap",
+                    background: "#ffffff",
+                    border: "1px solid #e7e5e4",
+                    borderRadius: "16px",
+                    padding: "20px",
                   }}
                 >
-                  <div style={{ flex: "1 1 360px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "16px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ flex: "1 1 360px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <h2
+                          style={{
+                            margin: 0,
+                            fontSize: "24px",
+                            color: "#1c1917",
+                          }}
+                        >
+                          {job.clientName || "Unnamed Client"}
+                        </h2>
+
+                        <span style={statusBadge}>
+                          Approved
+                        </span>
+
+                        <span
+                          style={
+                            paid
+                              ? paidBadge
+                              : unpaidBadge
+                          }
+                        >
+                          {paid ? "Paid" : "Unpaid"}
+                        </span>
+                      </div>
+
+                      <div style={detailLine}>
+                        Quote #: {job.quoteNumber || "Pending"}
+                      </div>
+
+                      <div style={detailLine}>
+                        Address: {job.projectAddress || "-"}
+                      </div>
+
+                      <div style={detailLine}>
+                        Start Window: {job.startWindow || "-"}
+                      </div>
+                    </div>
+
                     <div
                       style={{
-                        display: "flex",
-                        gap: "10px",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        marginBottom: "8px",
+                        flex: "0 1 220px",
+                        textAlign: "right",
                       }}
                     >
-                      <h2 style={{ margin: 0, color: "#1c1917", fontSize: "24px" }}>
-                        {job.clientName || "Unnamed Client"}
-                      </h2>
-                      <span style={statusBadge}>Approved</span>
-                    </div>
+                      <div
+                        style={{
+                          color: "#78716c",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        PROJECT TOTAL
+                      </div>
 
-                    <div style={detailLine}>Quote #: {job.quoteNumber || "Pending"}</div>
-                    <div style={detailLine}>Address: {job.projectAddress || "-"}</div>
-                    <div style={detailLine}>Start Window: {job.startWindow || "-"}</div>
+                      <div
+                        style={{
+                          color: "#1c1917",
+                          fontSize: "30px",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {job.projectTotal || "$0"}
+                      </div>
+                    </div>
                   </div>
 
-                  <div style={{ flex: "0 1 220px", textAlign: "right" }}>
-                    <div style={{ color: "#78716c", fontSize: "13px", fontWeight: 700 }}>
-                      PROJECT TOTAL
-                    </div>
-                    <div style={{ color: "#1c1917", fontSize: "30px", fontWeight: 800 }}>
-                      {job.projectTotal || "$0"}
-                    </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                      marginTop: "18px",
+                      paddingTop: "16px",
+                      borderTop: "1px solid #e7e5e4",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openQuote(job)}
+                      style={topButton("#1c1917", "#ffffff")}
+                    >
+                      Open Quote
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updatePayment(
+                          job.id,
+                          paid ? "Unpaid" : "Paid"
+                        )
+                      }
+                      style={topButton(
+                        paid ? "#d6d3d1" : "#15803d",
+                        paid ? "#1c1917" : "#ffffff"
+                      )}
+                    >
+                      {paid
+                        ? "Mark Unpaid"
+                        : "Mark Paid"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => completeJob(job.id)}
+                      style={topButton("#166534", "#ffffff")}
+                    >
+                      Mark Complete
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        sendBackToQuotes(job.id)
+                      }
+                      style={topButton("#d6d3d1", "#1c1917")}
+                    >
+                      Send Back to Quotes
+                    </button>
                   </div>
                 </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                    marginTop: "18px",
-                    paddingTop: "16px",
-                    borderTop: "1px solid #e7e5e4",
-                  }}
-                >
-                  <button type="button" onClick={() => openQuote(job)} style={topButton("#1c1917", "#ffffff")}>
-                    Open Quote
-                  </button>
-                  <button type="button" onClick={() => completeJob(job.id)} style={topButton("#15803d", "#ffffff")}>
-                    Mark Complete
-                  </button>
-                  <button type="button" onClick={() => sendBackToQuotes(job.id)} style={topButton("#d6d3d1", "#1c1917")}>
-                    Send Back to Quotes
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -310,6 +468,28 @@ const statusBadge = {
   padding: "5px 10px",
   fontSize: "12px",
   fontWeight: 800,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase" as const,
+};
+
+const paidBadge = {
+  display: "inline-flex",
+  alignItems: "center",
+  borderRadius: "999px",
+  background: "#dcfce7",
+  color: "#166534",
+  border: "1px solid #86efac",
+  padding: "5px 10px",
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const unpaidBadge = {
+  display: "inline-flex",
+  alignItems: "center",
+  borderRadius: "999px",
+  background: "#fee2e2",
+  color: "#991b1b",
+  border: "1px solid #fca5a5",
+  padding: "5px 10px",
+  fontSize: "12px",
+  fontWeight: 800,
 };
