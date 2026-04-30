@@ -80,19 +80,16 @@ export default function PreviewPage() {
 
 if (quote.bannerImage) {
   try {
-    const img = new Image();
-    img.src = quote.bannerImage;
-
-    const aspect = img.width / img.height || 1.6;
-
     const imgWidth = 170;
-    const imgHeight = imgWidth / aspect;
+    const imgHeight = 55;
 
     pdf.addImage(quote.bannerImage, "JPEG", 20, y, imgWidth, imgHeight);
-    y += imgHeight + 10;
+    y += imgHeight + 14;
   } catch {
-    y += 10;
+    y = 68;
   }
+} else {
+  y = 68;
 }
 
     const rows = [
