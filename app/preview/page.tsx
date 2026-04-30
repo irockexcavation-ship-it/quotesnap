@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
 import { PDFDocument } from "pdf-lib";
+import html2canvas from "html2canvas";
 import irockLogo from "../irock-logo.png";
 
 const COMPANY_NAME = "iRock Excavation & Hauling";
@@ -20,129 +21,71 @@ export default function PreviewPage() {
     const data = localStorage.getItem("quotesnapDraft");
     if (data) {
       const parsed = JSON.parse(data);
-
       setQuote({
         ...parsed,
-        paymentStatus:
-          parsed.paymentStatus || "Unpaid",
+        paymentStatus: parsed.paymentStatus || "Unpaid",
       });
     }
   }, []);
 
-  if (!quote) {
-    return <div style={{ padding: "40px" }}>Loading...</div>;
+  if (!quote) return <div style={{ padding: 40 }}>Loading...</div>;
+
+  const paid = quote.paymentStatus === "Paid";
+
+  // 🔥 EXPORT IMAGE (NEW)
+  async function downloadImage() {
+    const element = document.getElementById("quote-card");
+    if (!element) return;
+
+    const canvas = await html2canvas(element, { scale: 2 });
+
+    const link = document.createElement("a");
+    link.download = "quote-image.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   }
 
-  function slugify(value: string) {
-    return value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  }
-
-  function buildFileName() {
-    const quoteNum =
-      quote.quoteNumber || "IR-no-number";
-
-    const client = quote.clientName
-      ? slugify(quote.clientName)
-      : "client";
-
-    return `${client}_${quoteNum}_quote.pdf`;
-  }
-
+  // 🔥 PDF EXPORT (FIXED IMAGE)
   async function exportPDF() {
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(20);
-    pdf.text(COMPANY_NAME, 20, 20);
-
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(11);
-    pdf.text(COMPANY_PHONE, 20, 28);
-    pdf.text(COMPANY_EMAIL, 20, 34);
-    pdf.text(COMPANY_WEBSITE, 20, 40);
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
-    pdf.text("Project Quote", 20, 56);
-
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(12);
-
+    const pdf = new jsPDF();
     let y = 20;
 
-if (quote.bannerImage) {
-  try {
-    const imgWidth = 170;
-    const imgHeight = 55;
+    if (quote.bannerImage) {
+      try {
+        pdf.addImage(quote.bannerImage, "JPEG", 20, y, 170, 55);
+        y += 70;
+      } catch {}
+    }
 
-    pdf.addImage(quote.bannerImage, "JPEG", 20, y, imgWidth, imgHeight);
-    y += imgHeight + 14;
-  } catch {
-    y = 68;
-  }
-} else {
-  y = 68;
-}
+    pdf.setFontSize(18);
+    pdf.text(COMPANY_NAME, 20, y);
+    y += 10;
 
-    const rows = [
-      ["Quote #", quote.quoteNumber || "-"],
-      ["Client", quote.clientName || "-"],
-      ["Address", quote.projectAddress || "-"],
-      ["Contact", quote.contactInfo || "-"],
-      ["Date", quote.quoteDate || "-"],
-      ["Payment", quote.paymentStatus || "Unpaid"],
-    ];
-
-    rows.forEach((row) => {
-      pdf.text(`${row[0]}: ${row[1]}`, 20, y);
-      y += 8;
-    });
-
-    y += 6;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(22);
-    pdf.text(
-      `Total: ${quote.projectTotal || "$0"}`,
-      20,
-      y
-    );
-
-    y += 16;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(14);
-    pdf.text("Estimated Start Window", 20, y);
-
-    y += 8;
-
-    pdf.setFont("helvetica", "normal");
     pdf.setFontSize(11);
+    pdf.text(COMPANY_PHONE, 20, y);
+    y += 6;
+    pdf.text(COMPANY_EMAIL, 20, y);
+    y += 6;
+    pdf.text(COMPANY_WEBSITE, 20, y);
+    y += 10;
 
-    const startLines = pdf.splitTextToSize(
-      quote.startWindow || "-",
-      170
-    );
-
-    pdf.text(startLines, 20, y);
-
-    y += startLines.length * 6 + 10;
-
-    pdf.setFont("helvetica", "bold");
     pdf.setFontSize(14);
-    pdf.text("Scope of Work", 20, y);
+    pdf.text("Quote Details", 20, y);
+    y += 10;
 
-    y += 8;
+    pdf.setFontSize(11);
+    pdf.text(`Client: ${quote.clientName || "-"}`, 20, y); y += 6;
+    pdf.text(`Address: ${quote.projectAddress || "-"}`, 20, y); y += 6;
+    pdf.text(`Date: ${quote.quoteDate || "-"}`, 20, y); y += 6;
+    pdf.text(`Payment: ${quote.paymentStatus}`, 20, y); y += 10;
 
-    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(18);
+    pdf.text(`Total: ${quote.projectTotal || "$0"}`, 20, y);
+    y += 12;
+
+    pdf.setFontSize(12);
+    pdf.text("Scope of Work:", 20, y);
+    y += 6;
 
     const scopeLines = pdf.splitTextToSize(
       quote.scopeOfWork || "-",
@@ -151,567 +94,103 @@ if (quote.bannerImage) {
 
     pdf.text(scopeLines, 20, y);
 
-    const quoteBytes = pdf.output("arraybuffer");
+    const blob = pdf.output("blob");
+    const url = URL.createObjectURL(blob);
 
-    const mergedPdf =
-      await PDFDocument.create();
-
-    const quoteDoc =
-      await PDFDocument.load(quoteBytes);
-
-    const quotePages =
-      await mergedPdf.copyPages(
-        quoteDoc,
-        quoteDoc.getPageIndices()
-      );
-
-    quotePages.forEach((page) =>
-      mergedPdf.addPage(page)
-    );
-
-    try {
-      const coiResponse = await fetch(
-        "/coi.pdf"
-      );
-
-      if (coiResponse.ok) {
-        const coiBytes =
-          await coiResponse.arrayBuffer();
-
-        const coiDoc =
-          await PDFDocument.load(coiBytes);
-
-        const coiPages =
-          await mergedPdf.copyPages(
-            coiDoc,
-            coiDoc.getPageIndices()
-          );
-
-        coiPages.forEach((page) =>
-          mergedPdf.addPage(page)
-        );
-      }
-    } catch {}
-
-    const finalBytes =
-      await mergedPdf.save();
-
-    const pdfBuffer = finalBytes.buffer.slice(
-  finalBytes.byteOffset,
-  finalBytes.byteOffset + finalBytes.byteLength
-);
-
-const blob = new Blob(
-  [pdfBuffer as ArrayBuffer],
-  {
-    type: "application/pdf",
-  }
-);
-
-    const url =
-      URL.createObjectURL(blob);
-
-    const link =
-      document.createElement("a");
-
+    const link = document.createElement("a");
     link.href = url;
-    link.download = buildFileName();
+    link.download = "quote.pdf";
     link.click();
-
-    URL.revokeObjectURL(url);
   }
 
-  function updatePayment(
-    paymentStatus: PaymentStatus
-  ) {
-    const updatedQuote = {
-      ...quote,
-      paymentStatus,
-    };
+  function updatePayment(status: PaymentStatus) {
+    const updated = { ...quote, paymentStatus: status };
 
-    const activeQuotes = JSON.parse(
-      localStorage.getItem(
-        "quotesnapActiveQuotes"
-      ) || "[]"
+    const active = JSON.parse(localStorage.getItem("quotesnapActiveQuotes") || "[]");
+
+    const updatedList = active.map((q: any) =>
+      q.id === updated.id ? updated : q
     );
 
-    const updated = activeQuotes.map(
-      (q: any) =>
-        q.id === updatedQuote.id
-          ? updatedQuote
-          : q
-    );
-
-    localStorage.setItem(
-      "quotesnapActiveQuotes",
-      JSON.stringify(updated)
-    );
-
-    localStorage.setItem(
-      "quotesnapDraft",
-      JSON.stringify(updatedQuote)
-    );
-
-    setQuote(updatedQuote);
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedList));
+    localStorage.setItem("quotesnapDraft", JSON.stringify(updated));
+    setQuote(updated);
   }
 
   function handleApproveJob() {
-    const approvedQuote = {
+    const approved = {
       ...quote,
       status: "Approved",
-      paymentStatus:
-        quote.paymentStatus || "Unpaid",
-      approvedAt:
-        quote.approvedAt ||
-        new Date().toISOString(),
+      paymentStatus: quote.paymentStatus || "Unpaid",
     };
 
-    const activeQuotes = JSON.parse(
-      localStorage.getItem(
-        "quotesnapActiveQuotes"
-      ) || "[]"
-    );
+    const active = JSON.parse(localStorage.getItem("quotesnapActiveQuotes") || "[]");
+    const filtered = active.filter((q: any) => q.id !== approved.id);
 
-    const updatedQuotes =
-      activeQuotes.filter(
-        (q: any) =>
-          q.id !== approvedQuote.id
-      );
+    filtered.unshift(approved);
 
-    updatedQuotes.unshift(
-      approvedQuote
-    );
+    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(filtered));
+    localStorage.setItem("quotesnapDraft", JSON.stringify(approved));
 
-    localStorage.setItem(
-      "quotesnapActiveQuotes",
-      JSON.stringify(updatedQuotes)
-    );
-
-    localStorage.setItem(
-      "quotesnapDraft",
-      JSON.stringify(approvedQuote)
-    );
-
-    setQuote(approvedQuote);
+    setQuote(approved);
   }
-
-  function handleEdit() {
-    localStorage.setItem(
-      "quotesnapEditDraft",
-      JSON.stringify(quote)
-    );
-
-    window.location.href =
-      "/new-quote";
-  }
-
-  function goHome() {
-    window.location.href = "/";
-  }
-
-  function goCurrentJobs() {
-    window.location.href =
-      "/current-jobs";
-  }
-
-  const paid =
-    quote.paymentStatus === "Paid";
 
   return (
-    <main
-      style={{
-        background: "#f5f5f4",
-        minHeight: "100vh",
-        padding: "24px 14px 40px",
-        fontFamily:
-          "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin:
-            "0 auto 20px auto",
-          display: "flex",
-          gap: "10px",
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          onClick={goHome}
-          style={topButton(
-            "#e7e5e4",
-            "#1c1917"
-          )}
-        >
-          Home
+    <main style={{ padding: 20, background: "#f5f5f4", minHeight: "100vh" }}>
+      
+      {/* 🔥 BUTTON ROW */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <button onClick={exportPDF} style={btn}>Export PDF</button>
+        <button onClick={downloadImage} style={btn}>Export Image</button>
+        <button onClick={() => updatePayment(paid ? "Unpaid" : "Paid")} style={btn}>
+          {paid ? "Mark Unpaid" : "Mark Paid"}
         </button>
-
-        <button
-          onClick={exportPDF}
-          style={topButton(
-            "#1c1917",
-            "#ffffff"
-          )}
-        >
-          Export PDF
-        </button>
-
-        <button
-          onClick={handleApproveJob}
-          style={topButton(
-            "#15803d",
-            "#ffffff"
-          )}
-        >
-          Mark Approved
-        </button>
-
-        <button
-          onClick={() =>
-            updatePayment(
-              paid
-                ? "Unpaid"
-                : "Paid"
-            )
-          }
-          style={topButton(
-            paid
-              ? "#d6d3d1"
-              : "#166534",
-            paid
-              ? "#1c1917"
-              : "#ffffff"
-          )}
-        >
-          {paid
-            ? "Mark Unpaid"
-            : "Mark Paid"}
-        </button>
-
-        <button
-          onClick={
-            goCurrentJobs
-          }
-          style={topButton(
-            "#7c2d12",
-            "#ffffff"
-          )}
-        >
-          Current Jobs
-        </button>
-
-        <button
-          onClick={handleEdit}
-          style={topButton(
-            "#2563eb",
-            "#ffffff"
-          )}
-        >
-          Edit Quote
-        </button>
+        <button onClick={handleApproveJob} style={btn}>Mark Approved</button>
       </div>
 
+      {/* 🔥 QUOTE CARD */}
       <div
+        id="quote-card"
         style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-          background: "#ffffff",
-          borderRadius: "16px",
+          background: "#fff",
+          borderRadius: 16,
           overflow: "hidden",
-          border:
-            "1px solid #e7e5e4",
+          maxWidth: 800,
+          margin: "0 auto",
+          border: "1px solid #ddd",
         }}
       >
-        {quote.bannerImage ? (
+        {quote.bannerImage && (
           <img
-            src={
-              quote.bannerImage
-            }
-            alt="Project"
-            style={{
-              width: "100%",
-              height: "260px",
-              objectFit:
-                "cover",
-            }}
+            src={quote.bannerImage}
+            style={{ width: "100%", height: 250, objectFit: "cover" }}
           />
-        ) : null}
+        )}
 
-        <div
-          style={{
-            padding:
-              "34px 32px 36px",
-          }}
-        >
-          <img
-            src={
-              irockLogo.src
-            }
-            alt="Logo"
-            style={{
-              height: "70px",
-              marginBottom:
-                "14px",
-            }}
-          />
+        <div style={{ padding: 24 }}>
+          <h2>{quote.clientName}</h2>
+          <p>{quote.projectAddress}</p>
 
-          <h1
-            style={{
-              margin:
-                "0 0 10px",
-              fontSize:
-                "30px",
-            }}
-          >
-            {
-              COMPANY_NAME
-            }
-          </h1>
-
-          <div
-            style={{
-              color:
-                "#57534e",
-              marginBottom:
-                "24px",
-            }}
-          >
-            {
-              COMPANY_TAGLINE
-            }
+          <div style={{ marginBottom: 10 }}>
+            <strong>Status:</strong> {quote.status || "Draft"} |{" "}
+            <strong>{quote.paymentStatus}</strong>
           </div>
 
-          <div
-            style={{
-              display:
-                "grid",
-              gap: "8px",
-              marginBottom:
-                "24px",
-            }}
-          >
-            <InfoRow
-              label="Quote #"
-              value={
-                quote.quoteNumber
-              }
-            />
-            <InfoRow
-              label="Client"
-              value={
-                quote.clientName
-              }
-            />
-            <InfoRow
-              label="Address"
-              value={
-                quote.projectAddress
-              }
-            />
-            <InfoRow
-              label="Contact"
-              value={
-                quote.contactInfo
-              }
-            />
-            <InfoRow
-              label="Date"
-              value={
-                quote.quoteDate
-              }
-            />
-          </div>
+          <h1 style={{ fontSize: 32 }}>{quote.projectTotal}</h1>
 
-          <div
-            style={{
-              display:
-                "flex",
-              gap: "10px",
-              flexWrap:
-                "wrap",
-              marginBottom:
-                "20px",
-            }}
-          >
-            <span
-              style={
-                quote.status ===
-                "Approved"
-                  ? approvedBadge
-                  : draftBadge
-              }
-            >
-              {quote.status ||
-                "Draft"}
-            </span>
-
-            <span
-              style={
-                paid
-                  ? paidBadge
-                  : unpaidBadge
-              }
-            >
-              {paid
-                ? "Paid"
-                : "Unpaid"}
-            </span>
-          </div>
-
-          <div
-            style={{
-              fontSize:
-                "42px",
-              fontWeight:
-                800,
-              marginBottom:
-                "24px",
-            }}
-          >
-            {
-              quote.projectTotal
-            }
-          </div>
-
-          <SectionCard title="Estimated Start Window">
-            <p style={bodyText}>
-              {quote.startWindow ||
-                "-"}
-            </p>
-          </SectionCard>
-
-          <SectionCard title="Scope of Work">
-            <p
-              style={{
-                ...bodyText,
-                whiteSpace:
-                  "pre-line",
-              }}
-            >
-              {quote.scopeOfWork ||
-                "-"}
-            </p>
-          </SectionCard>
+          <h3>Scope of Work</h3>
+          <p style={{ whiteSpace: "pre-line" }}>{quote.scopeOfWork}</p>
         </div>
       </div>
     </main>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns:
-          "90px 1fr",
-        gap: "10px",
-      }}
-    >
-      <strong>
-        {label}
-      </strong>
-      <span>
-        {value || "-"}
-      </span>
-    </div>
-  );
-}
-
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      style={{
-        marginBottom:
-          "18px",
-        padding:
-          "18px",
-        border:
-          "1px solid #e7e5e4",
-        borderRadius:
-          "14px",
-      }}
-    >
-      <h2
-        style={{
-          margin:
-            "0 0 10px",
-          fontSize:
-            "22px",
-        }}
-      >
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function topButton(
-  background: string,
-  color: string
-) {
-  return {
-    padding:
-      "12px 18px",
-    borderRadius:
-      "8px",
-    border: "none",
-    background,
-    color,
-    cursor: "pointer",
-    fontWeight:
-      "bold" as const,
-  };
-}
-
-const bodyText = {
-  margin: 0,
-  lineHeight: 1.8,
-  color: "#292524",
-};
-
-const approvedBadge = {
-  padding: "6px 10px",
-  borderRadius: "999px",
-  background: "#dcfce7",
-  color: "#166534",
-  fontWeight: 800,
-};
-
-const draftBadge = {
-  padding: "6px 10px",
-  borderRadius: "999px",
-  background: "#e7e5e4",
-  color: "#44403c",
-  fontWeight: 800,
-};
-
-const paidBadge = {
-  padding: "6px 10px",
-  borderRadius: "999px",
-  background: "#dcfce7",
-  color: "#166534",
-  fontWeight: 800,
-};
-
-const unpaidBadge = {
-  padding: "6px 10px",
-  borderRadius: "999px",
-  background: "#fee2e2",
-  color: "#991b1b",
-  fontWeight: 800,
+const btn = {
+  padding: "12px 16px",
+  borderRadius: 8,
+  border: "none",
+  background: "#1c1917",
+  color: "#fff",
+  cursor: "pointer",
 };
