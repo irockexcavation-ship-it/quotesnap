@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
-import { PDFDocument } from "pdf-lib";
 import html2canvas from "html2canvas";
 import irockLogo from "../irock-logo.png";
 
 const COMPANY_NAME = "iRock Excavation & Hauling";
-const COMPANY_TAGLINE = "Rock Solid Driveway Systems";
 const COMPANY_PHONE = "(502) 552-9462";
 const COMPANY_EMAIL = "irockexcavation@gmail.com";
 const COMPANY_WEBSITE = "iRockX.com";
@@ -32,6 +30,12 @@ export default function PreviewPage() {
 
   const paid = quote.paymentStatus === "Paid";
 
+  // 🔥 EDIT QUOTE (FIX)
+  function handleEdit() {
+    localStorage.setItem("quotesnapEditDraft", JSON.stringify(quote));
+    window.location.href = "/new-quote";
+  }
+
   // 🔥 EXPORT IMAGE
   async function downloadImage() {
     const element = document.getElementById("quote-card");
@@ -45,18 +49,51 @@ export default function PreviewPage() {
     link.click();
   }
 
-  // 🔥 KEEP YOUR EXISTING PDF FUNCTION (UNCHANGED)
+  // 🔥 SIMPLE PDF
   async function exportPDF() {
     const pdf = new jsPDF();
-    pdf.text("Use your existing PDF logic here", 20, 20);
+    let y = 20;
 
-    const blob = pdf.output("blob");
-    const url = URL.createObjectURL(blob);
+    if (quote.bannerImage) {
+      try {
+        pdf.addImage(quote.bannerImage, "JPEG", 20, y, 170, 55);
+        y += 70;
+      } catch {}
+    }
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "quote.pdf";
-    link.click();
+    pdf.setFontSize(18);
+    pdf.text(COMPANY_NAME, 20, y);
+    y += 10;
+
+    pdf.setFontSize(11);
+    pdf.text(COMPANY_PHONE, 20, y); y += 6;
+    pdf.text(COMPANY_EMAIL, 20, y); y += 6;
+    pdf.text(COMPANY_WEBSITE, 20, y); y += 10;
+
+    pdf.setFontSize(14);
+    pdf.text("Quote Details", 20, y); y += 10;
+
+    pdf.setFontSize(11);
+    pdf.text(`Client: ${quote.clientName || "-"}`, 20, y); y += 6;
+    pdf.text(`Address: ${quote.projectAddress || "-"}`, 20, y); y += 6;
+    pdf.text(`Date: ${quote.quoteDate || "-"}`, 20, y); y += 6;
+    pdf.text(`Payment: ${quote.paymentStatus}`, 20, y); y += 10;
+
+    pdf.setFontSize(18);
+    pdf.text(`Total: ${quote.projectTotal || "$0"}`, 20, y);
+    y += 12;
+
+    pdf.setFontSize(12);
+    pdf.text("Scope of Work:", 20, y); y += 6;
+
+    const scopeLines = pdf.splitTextToSize(
+      quote.scopeOfWork || "-",
+      170
+    );
+
+    pdf.text(scopeLines, 20, y);
+
+    pdf.save("quote.pdf");
   }
 
   function updatePayment(status: PaymentStatus) {
@@ -98,9 +135,12 @@ export default function PreviewPage() {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <button onClick={exportPDF} style={btn}>Export PDF</button>
         <button onClick={downloadImage} style={btn}>Export Image</button>
+        <button onClick={handleEdit} style={btn}>Edit Quote</button>
+
         <button onClick={() => updatePayment(paid ? "Unpaid" : "Paid")} style={btn}>
           {paid ? "Mark Unpaid" : "Mark Paid"}
         </button>
+
         <button onClick={handleApproveJob} style={btn}>Mark Approved</button>
       </div>
 
@@ -140,7 +180,7 @@ export default function PreviewPage() {
           <p style={{ whiteSpace: "pre-line" }}>{quote.scopeOfWork}</p>
         </div>
 
-        {/* 🔥 NEW FOOTER */}
+        {/* FOOTER */}
         <div
           style={{
             borderTop: "1px solid #eee",
