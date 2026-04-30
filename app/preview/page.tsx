@@ -80,13 +80,19 @@ export default function PreviewPage() {
 
 if (quote.bannerImage) {
   try {
-    pdf.addImage(quote.bannerImage, "JPEG", 20, y, 170, 65);
-    y += 78;
+    const img = new Image();
+    img.src = quote.bannerImage;
+
+    const aspect = img.width / img.height || 1.6;
+
+    const imgWidth = 170;
+    const imgHeight = imgWidth / aspect;
+
+    pdf.addImage(quote.bannerImage, "JPEG", 20, y, imgWidth, imgHeight);
+    y += imgHeight + 10;
   } catch {
-    y = 68;
+    y += 10;
   }
-} else {
-  y = 68;
 }
 
     const rows = [
