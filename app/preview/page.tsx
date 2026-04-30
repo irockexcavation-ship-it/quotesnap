@@ -76,7 +76,18 @@ export default function PreviewPage() {
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(12);
 
-    let y = 68;
+    let y = 20;
+
+if (quote.bannerImage) {
+  try {
+    pdf.addImage(quote.bannerImage, "JPEG", 20, y, 170, 65);
+    y += 78;
+  } catch {
+    y = 68;
+  }
+} else {
+  y = 68;
+}
 
     const rows = [
       ["Quote #", quote.quoteNumber || "-"],
