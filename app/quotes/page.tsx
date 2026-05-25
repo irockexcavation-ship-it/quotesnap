@@ -59,11 +59,11 @@ export default function QuotesPage() {
 
   function migrateLegacyQuotesIfNeeded() {
     const legacyRaw = localStorage.getItem("quotesnapSavedQuotes");
-    const activeRaw = localStorage.getItem("quotesnapActiveQuotes");
+    const activeRaw = localStorage.getItem("quotesnapSavedQuotes");
     const archivedRaw = localStorage.getItem("quotesnapArchivedQuotes");
 
     const hasNewData =
-      (activeRaw && safeParseQuotes("quotesnapActiveQuotes").length > 0) ||
+      (activeRaw && safeParseQuotes("quotesnapSavedQuotes").length > 0) ||
       (archivedRaw && safeParseQuotes("quotesnapArchivedQuotes").length > 0);
 
     if (!legacyRaw || hasNewData) return;
@@ -85,16 +85,16 @@ export default function QuotesPage() {
         }))
     );
 
-    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(activeQuotes));
+    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(activeQuotes));
     localStorage.setItem("quotesnapArchivedQuotes", JSON.stringify(archivedQuotes));
   }
 
   function cleanDuplicateActiveQuotes() {
-    const active = safeParseQuotes("quotesnapActiveQuotes");
+    const active = safeParseQuotes("quotesnapSavedQuotes");
     const cleaned = dedupeQuotes(active);
 
     if (cleaned.length !== active.length) {
-      localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(cleaned));
+      localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(cleaned));
     }
   }
 
@@ -117,7 +117,7 @@ export default function QuotesPage() {
   }
 
   function autoArchiveOldSentQuotes() {
-    const active = dedupeQuotes(safeParseQuotes("quotesnapActiveQuotes"));
+    const active = dedupeQuotes(safeParseQuotes("quotesnapSavedQuotes"));
     const archived = dedupeQuotes(safeParseQuotes("quotesnapArchivedQuotes"));
 
     const oldSentQuotes = active.filter(isSentOlderThan30Days);
@@ -134,7 +134,7 @@ export default function QuotesPage() {
       archiveReason: "Auto-archived after 30 days sent",
     }));
 
-    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(remainingActive));
+    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(remainingActive));
     localStorage.setItem(
       "quotesnapArchivedQuotes",
       JSON.stringify(dedupeQuotes([...movedToArchive, ...archiveWithoutDuplicates]))
@@ -142,11 +142,11 @@ export default function QuotesPage() {
   }
 
   function loadQuotes() {
-    const stored = safeParseQuotes("quotesnapActiveQuotes");
+    const stored = safeParseQuotes("quotesnapSavedQuotes");
     const cleaned = dedupeQuotes(stored);
 
     if (cleaned.length !== stored.length) {
-      localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(cleaned));
+      localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(cleaned));
     }
 
     setQuotes([...cleaned].reverse());
@@ -154,7 +154,7 @@ export default function QuotesPage() {
 
   function saveActiveQuotes(updatedQuotes: QuoteItem[]) {
     const storageOrder = dedupeQuotes([...updatedQuotes].reverse());
-    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(storageOrder));
+    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(storageOrder));
     setQuotes([...storageOrder].reverse());
   }
 
@@ -201,7 +201,7 @@ export default function QuotesPage() {
   }
 
   function updateStatus(quoteToUpdate: QuoteItem, status: QuoteStatus) {
-    const active = safeParseQuotes("quotesnapActiveQuotes");
+    const active = safeParseQuotes("quotesnapSavedQuotes");
     const cleanedActive = dedupeQuotes(active);
 
     if (status === "Archived") {
@@ -222,7 +222,7 @@ export default function QuotesPage() {
         archiveReason: "Manually archived",
       });
 
-      localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedActive));
+      localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updatedActive));
       localStorage.setItem(
         "quotesnapArchivedQuotes",
         JSON.stringify(dedupeQuotes(cleanedArchived))
@@ -244,7 +244,7 @@ export default function QuotesPage() {
       };
     });
 
-    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(updatedActive));
+    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updatedActive));
     setQuotes([...updatedActive].reverse());
   }
 
