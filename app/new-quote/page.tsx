@@ -14,12 +14,21 @@ export default function NewQuotePage() {
   const [bannerImage, setBannerImage] = useState("");
 
   // Terms Toggles
-  const [includePaymentTerms, setIncludePaymentTerms] = useState(true);
-  const [includeWeatherDisclaimer, setIncludeWeatherDisclaimer] =
+  const [includePaymentTerms, setIncludePaymentTerms] =
     useState(true);
-  const [includeScopeDisclaimer, setIncludeScopeDisclaimer] =
-    useState(true);
-  const [includeDepositNote, setIncludeDepositNote] = useState(false);
+
+  const [
+    includeWeatherDisclaimer,
+    setIncludeWeatherDisclaimer,
+  ] = useState(true);
+
+  const [
+    includeScopeDisclaimer,
+    setIncludeScopeDisclaimer,
+  ] = useState(true);
+
+  const [includeDepositNote, setIncludeDepositNote] =
+    useState(false);
 
   useEffect(() => {
     const savedDraft =
@@ -54,36 +63,100 @@ export default function NewQuotePage() {
         draft.includeDepositNote ?? false
       );
     } else {
+      const year = new Date().getFullYear();
+
+      const savedCounter =
+        Number(
+          localStorage.getItem("quotesnapQuoteCounter")
+        ) || 1001;
+
+      setQuoteNumber(`IR-${year}-${savedCounter}`);
+
+      localStorage.setItem(
+        "quotesnapQuoteCounter",
+        String(savedCounter + 1)
+      );
+
       setQuoteDate(new Date().toISOString().slice(0, 10));
     }
   }, []);
 
-  function handlePhotoUpload(
+  async function compressImage(
+    file: File
+  ): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        const img = new Image();
+
+        img.onload = () => {
+          const canvas =
+            document.createElement("canvas");
+
+          const maxWidth = 1200;
+
+          const scale =
+            maxWidth / img.width;
+
+          canvas.width = maxWidth;
+
+          canvas.height =
+            img.height * scale;
+
+          const ctx =
+            canvas.getContext("2d");
+
+          ctx?.drawImage(
+            img,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          const compressed =
+            canvas.toDataURL(
+              "image/jpeg",
+              0.7
+            );
+
+          resolve(compressed);
+        };
+
+        img.src = event.target?.result as string;
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handlePhotoUpload(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
-    const reader = new FileReader();
+    const compressed =
+      await compressImage(file);
 
-    reader.onload = () => {
-      const result = reader.result as string;
+    setBannerImage(compressed);
 
-      setBannerImage(result);
+    const link =
+      document.createElement("a");
 
-      const link = document.createElement("a");
-      link.href = result;
-      link.download = `quotesnap-photo-${Date.now()}.jpg`;
-      link.click();
-    };
+    link.href = compressed;
 
-    reader.readAsDataURL(file);
+    link.download = `quotesnap-photo-${Date.now()}.jpg`;
+
+    link.click();
   }
 
   function saveQuote() {
     const quoteData = {
       id: Date.now().toString(),
+
       clientName,
       projectAddress,
       contactInfo,
@@ -106,15 +179,20 @@ export default function NewQuotePage() {
     );
 
     const existingQuotes = JSON.parse(
-      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+      localStorage.getItem(
+        "quotesnapSavedQuotes"
+      ) || "[]"
     );
 
-    const existingIndex = existingQuotes.findIndex(
-      (q: any) => q.quoteNumber === quoteNumber
-    );
+    const existingIndex =
+      existingQuotes.findIndex(
+        (q: any) =>
+          q.quoteNumber === quoteNumber
+      );
 
     if (existingIndex >= 0) {
-      existingQuotes[existingIndex] = quoteData;
+      existingQuotes[existingIndex] =
+        quoteData;
     } else {
       existingQuotes.push(quoteData);
     }
@@ -124,7 +202,9 @@ export default function NewQuotePage() {
       JSON.stringify(existingQuotes)
     );
 
-    localStorage.removeItem("quotesnapEditDraft");
+    localStorage.removeItem(
+      "quotesnapEditDraft"
+    );
 
     window.location.href = "/preview";
   }
@@ -143,7 +223,12 @@ export default function NewQuotePage() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <div style={{ maxWidth: "860px", margin: "0 auto" }}>
+      <div
+        style={{
+          maxWidth: "860px",
+          margin: "0 auto",
+        }}
+      >
         <button
           onClick={goHome}
           style={secondaryButton}
@@ -156,7 +241,8 @@ export default function NewQuotePage() {
             background: "#ffffff",
             borderRadius: "20px",
             border: "1px solid #e7e5e4",
-            boxShadow: "0 16px 40px rgba(0,0,0,0.10)",
+            boxShadow:
+              "0 16px 40px rgba(0,0,0,0.10)",
             padding: "28px 22px 24px",
           }}
         >
@@ -171,11 +257,16 @@ export default function NewQuotePage() {
           </h1>
 
           <div style={fieldGroup}>
-            <label style={labelStyle}>Client Name</label>
+            <label style={labelStyle}>
+              Client Name
+            </label>
+
             <input
               value={clientName}
               onChange={(e) =>
-                setClientName(e.target.value)
+                setClientName(
+                  e.target.value
+                )
               }
               style={inputStyle}
             />
@@ -185,21 +276,29 @@ export default function NewQuotePage() {
             <label style={labelStyle}>
               Project Address
             </label>
+
             <input
               value={projectAddress}
               onChange={(e) =>
-                setProjectAddress(e.target.value)
+                setProjectAddress(
+                  e.target.value
+                )
               }
               style={inputStyle}
             />
           </div>
 
           <div style={fieldGroup}>
-            <label style={labelStyle}>Contact Info</label>
+            <label style={labelStyle}>
+              Contact Info
+            </label>
+
             <input
               value={contactInfo}
               onChange={(e) =>
-                setContactInfo(e.target.value)
+                setContactInfo(
+                  e.target.value
+                )
               }
               style={inputStyle}
             />
@@ -210,22 +309,30 @@ export default function NewQuotePage() {
               <label style={labelStyle}>
                 Quote Number
               </label>
+
               <input
                 value={quoteNumber}
                 onChange={(e) =>
-                  setQuoteNumber(e.target.value)
+                  setQuoteNumber(
+                    e.target.value
+                  )
                 }
                 style={inputStyle}
               />
             </div>
 
             <div style={fieldGroup}>
-              <label style={labelStyle}>Quote Date</label>
+              <label style={labelStyle}>
+                Quote Date
+              </label>
+
               <input
                 type="date"
                 value={quoteDate}
                 onChange={(e) =>
-                  setQuoteDate(e.target.value)
+                  setQuoteDate(
+                    e.target.value
+                  )
                 }
                 style={inputStyle}
               />
@@ -236,10 +343,13 @@ export default function NewQuotePage() {
             <label style={labelStyle}>
               Project Total
             </label>
+
             <input
               value={projectTotal}
               onChange={(e) =>
-                setProjectTotal(e.target.value)
+                setProjectTotal(
+                  e.target.value
+                )
               }
               style={inputStyle}
             />
@@ -249,10 +359,13 @@ export default function NewQuotePage() {
             <label style={labelStyle}>
               Estimated Start Window
             </label>
+
             <input
               value={startWindow}
               onChange={(e) =>
-                setStartWindow(e.target.value)
+                setStartWindow(
+                  e.target.value
+                )
               }
               style={inputStyle}
             />
@@ -266,7 +379,9 @@ export default function NewQuotePage() {
             <textarea
               value={scopeOfWork}
               onChange={(e) =>
-                setScopeOfWork(e.target.value)
+                setScopeOfWork(
+                  e.target.value
+                )
               }
               rows={10}
               style={textareaStyle}
@@ -285,13 +400,14 @@ export default function NewQuotePage() {
             />
           </div>
 
-          {/* Terms Section */}
+          {/* TERMS */}
 
           <div
             style={{
               marginTop: "24px",
               background: "#fafaf9",
-              border: "1px solid #e7e5e4",
+              border:
+                "1px solid #e7e5e4",
               borderRadius: "16px",
               padding: "18px",
             }}
@@ -310,7 +426,9 @@ export default function NewQuotePage() {
             <label style={toggleStyle}>
               <input
                 type="checkbox"
-                checked={includePaymentTerms}
+                checked={
+                  includePaymentTerms
+                }
                 onChange={(e) =>
                   setIncludePaymentTerms(
                     e.target.checked
@@ -323,7 +441,9 @@ export default function NewQuotePage() {
             <label style={toggleStyle}>
               <input
                 type="checkbox"
-                checked={includeWeatherDisclaimer}
+                checked={
+                  includeWeatherDisclaimer
+                }
                 onChange={(e) =>
                   setIncludeWeatherDisclaimer(
                     e.target.checked
@@ -336,7 +456,9 @@ export default function NewQuotePage() {
             <label style={toggleStyle}>
               <input
                 type="checkbox"
-                checked={includeScopeDisclaimer}
+                checked={
+                  includeScopeDisclaimer
+                }
                 onChange={(e) =>
                   setIncludeScopeDisclaimer(
                     e.target.checked
@@ -349,7 +471,9 @@ export default function NewQuotePage() {
             <label style={toggleStyle}>
               <input
                 type="checkbox"
-                checked={includeDepositNote}
+                checked={
+                  includeDepositNote
+                }
                 onChange={(e) =>
                   setIncludeDepositNote(
                     e.target.checked
@@ -361,6 +485,7 @@ export default function NewQuotePage() {
           </div>
 
           <button
+            type="button"
             onClick={saveQuote}
             style={{
               ...primaryButton,
