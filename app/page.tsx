@@ -2,39 +2,85 @@
 
 import { useEffect } from "react";
 
+type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
+
+type QuoteItem = {
+  id?: string;
+  quoteNumber?: string;
+  clientName?: string;
+  projectAddress?: string;
+  contactInfo?: string;
+  quoteDate?: string;
+  projectTotal?: string;
+  startWindow?: string;
+  scopeOfWork?: string;
+  bannerImage?: string;
+  status?: QuoteStatus;
+  paymentStatus?: "Paid" | "Unpaid";
+  approvedAt?: string;
+};
+
+const SAVED_KEY = "quotesnapSavedQuotes";
+
+const OLD_JOB_KEYS = [
+  "quotesnapActiveQuotes",
+  "quotesnapCurrentJobs",
+  "quotesnapApprovedQuotes",
+];
+
 export default function HomePage() {
   useEffect(() => {
     recoverOldCurrentJobs();
   }, []);
 
+  function safelyReadArray(key: string): QuoteItem[] {
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = JSON.parse(raw || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
   function recoverOldCurrentJobs() {
-    const activeRaw = localStorage.getItem("quotesnapActiveQuotes");
-    const savedRaw = localStorage.getItem("quotesnapSavedQuotes");
+    const savedQuotes = safelyReadArray(SAVED_KEY);
 
-    const oldActiveQuotes = JSON.parse(activeRaw || "[]");
-    const savedQuotes = JSON.parse(savedRaw || "[]");
+    const existingIds = new Set(
+      savedQuotes.map((q) => q.id || q.quoteNumber).filter(Boolean)
+    );
 
-    if (!Array.isArray(oldActiveQuotes) || oldActiveQuotes.length === 0) {
-      return;
+    let recoveredJobs: QuoteItem[] = [];
+
+    for (const key of OLD_JOB_KEYS) {
+      const oldJobs = safelyReadArray(key);
+
+      const cleanedJobs = oldJobs
+        .filter((job) => {
+          const identifier = job.id || job.quoteNumber;
+          return identifier && !existingIds.has(identifier);
+        })
+        .map((job) => {
+          const fixedJob = {
+            ...job,
+            id: job.id || `${job.quoteNumber || "recovered"}-${Date.now()}`,
+            status: "Approved" as QuoteStatus,
+            paymentStatus: job.paymentStatus || "Unpaid",
+            approvedAt: job.approvedAt || new Date().toISOString(),
+          };
+
+          existingIds.add(fixedJob.id || fixedJob.quoteNumber || "");
+
+          return fixedJob;
+        });
+
+      recoveredJobs = [...recoveredJobs, ...cleanedJobs];
     }
 
-    const savedIds = new Set(savedQuotes.map((q: any) => q.id));
-
-    const recoveredJobs = oldActiveQuotes
-      .filter((q: any) => !savedIds.has(q.id))
-      .map((q: any) => ({
-        ...q,
-        status: "Approved",
-        paymentStatus: q.paymentStatus || "Unpaid",
-        approvedAt: q.approvedAt || new Date().toISOString(),
-      }));
-
-    if (recoveredJobs.length === 0) {
-      return;
-    }
+    if (recoveredJobs.length === 0) return;
 
     localStorage.setItem(
-      "quotesnapSavedQuotes",
+      SAVED_KEY,
       JSON.stringify([...recoveredJobs, ...savedQuotes])
     );
 
@@ -135,12 +181,7 @@ export default function HomePage() {
           and PDF export.
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: "14px",
-          }}
-        >
+        <div style={{ display: "grid", gap: "14px" }}>
           <button onClick={startNewQuote} style={primaryButton}>
             New Quote
           </button>
