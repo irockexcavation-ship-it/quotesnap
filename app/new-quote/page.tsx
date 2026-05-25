@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 export default function NewQuotePage() {
+  const [quoteId, setQuoteId] = useState("");
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [contactInfo, setContactInfo] = useState("");
@@ -12,13 +13,13 @@ export default function NewQuotePage() {
   const [startWindow, setStartWindow] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
   const [bannerImage, setBannerImage] = useState("");
+  const [status, setStatus] = useState<"Draft" | "Sent" | "Approved" | "Archived">("Draft");
 
   const [includePaymentTerms, setIncludePaymentTerms] = useState(true);
   const [includeWeatherDisclaimer, setIncludeWeatherDisclaimer] = useState(true);
   const [includeScopeDisclaimer, setIncludeScopeDisclaimer] = useState(true);
   const [includeDepositNote, setIncludeDepositNote] = useState(false);
-  const [includeAcceptanceLanguage, setIncludeAcceptanceLanguage] =
-    useState(true);
+  const [includeAcceptanceLanguage, setIncludeAcceptanceLanguage] = useState(true);
 
   useEffect(() => {
     const savedDraft = localStorage.getItem("quotesnapEditDraft");
@@ -26,15 +27,17 @@ export default function NewQuotePage() {
     if (savedDraft) {
       const draft = JSON.parse(savedDraft);
 
+      setQuoteId(draft.id || Date.now().toString());
       setClientName(draft.clientName || "");
       setProjectAddress(draft.projectAddress || "");
       setContactInfo(draft.contactInfo || "");
-      setQuoteNumber(draft.quoteNumber || "");
-      setQuoteDate(draft.quoteDate || "");
+      setQuoteNumber(draft.quoteNumber || generateQuoteNumber());
+      setQuoteDate(draft.quoteDate || getToday());
       setProjectTotal(draft.projectTotal || "");
       setStartWindow(draft.startWindow || "");
       setScopeOfWork(draft.scopeOfWork || "");
       setBannerImage(draft.bannerImage || "");
+      setStatus(draft.status || "Draft");
 
       setIncludePaymentTerms(draft.includePaymentTerms ?? true);
       setIncludeWeatherDisclaimer(draft.includeWeatherDisclaimer ?? true);
@@ -42,15 +45,32 @@ export default function NewQuotePage() {
       setIncludeDepositNote(draft.includeDepositNote ?? false);
       setIncludeAcceptanceLanguage(draft.includeAcceptanceLanguage ?? true);
     } else {
-      const year = new Date().getFullYear();
-      const savedCounter =
-        Number(localStorage.getItem("quotesnapQuoteCounter")) || 1001;
-
-      setQuoteNumber(`IR-${year}-${savedCounter}`);
-      localStorage.setItem("quotesnapQuoteCounter", String(savedCounter + 1));
-      setQuoteDate(new Date().toISOString().slice(0, 10));
+      setQuoteId(Date.now().toString());
+      setQuoteNumber(generateQuoteNumber());
+      setQuoteDate(getToday());
+      setStatus("Draft");
     }
   }, []);
+
+  function getToday() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function generateQuoteNumber() {
+    const year = new Date().getFullYear();
+
+    const existingQuotes = JSON.parse(
+      localStorage.getItem("quotesnapSavedQuotes") || "[]"
+    );
+
+    const yearQuotes = existingQuotes.filter((q: any) =>
+      String(q.quoteNumber || "").startsWith(`IR-${year}-`)
+    );
+
+    const nextNumber = yearQuotes.length + 1;
+
+    return `IR-${year}-${String(nextNumber).padStart(3, "0")}`;
+  }
 
   async function compressImage(file: File): Promise<string> {
     return new Promise((resolve) => {
@@ -62,9 +82,9 @@ export default function NewQuotePage() {
         img.onload = () => {
           const canvas = document.createElement("canvas");
           const maxWidth = 1200;
-          const scale = maxWidth / img.width;
+          const scale = img.width > maxWidth ? maxWidth / img.width : 1;
 
-          canvas.width = maxWidth;
+          canvas.width = img.width * scale;
           canvas.height = img.height * scale;
 
           const ctx = canvas.getContext("2d");
@@ -83,21 +103,15 @@ export default function NewQuotePage() {
 
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-
     if (!file) return;
 
     const compressed = await compressImage(file);
     setBannerImage(compressed);
-
-    const link = document.createElement("a");
-    link.href = compressed;
-    link.download = `quotesnap-photo-${Date.now()}.jpg`;
-    link.click();
   }
 
   function saveQuote() {
     const quoteData = {
-      id: Date.now().toString(),
+      id: quoteId || Date.now().toString(),
       clientName,
       projectAddress,
       contactInfo,
@@ -107,6 +121,7 @@ export default function NewQuotePage() {
       startWindow,
       scopeOfWork,
       bannerImage,
+      status: status || "Draft",
       includePaymentTerms,
       includeWeatherDisclaimer,
       includeScopeDisclaimer,
@@ -121,16 +136,19 @@ export default function NewQuotePage() {
     );
 
     const existingIndex = existingQuotes.findIndex(
-      (q: any) => q.quoteNumber === quoteNumber
+      (q: any) => q.id === quoteData.id || q.quoteNumber === quoteData.quoteNumber
     );
 
+    let updatedQuotes;
+
     if (existingIndex >= 0) {
-      existingQuotes[existingIndex] = quoteData;
+      updatedQuotes = [...existingQuotes];
+      updatedQuotes[existingIndex] = quoteData;
     } else {
-      existingQuotes.push(quoteData);
+      updatedQuotes = [quoteData, ...existingQuotes];
     }
 
-    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(existingQuotes));
+    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updatedQuotes));
     localStorage.removeItem("quotesnapEditDraft");
 
     window.location.href = "/preview";
@@ -163,96 +181,71 @@ export default function NewQuotePage() {
             padding: "28px 22px 24px",
           }}
         >
-          <h1
-            style={{
-              fontSize: "34px",
-              marginBottom: "24px",
-              color: "#1c1917",
-            }}
-          >
+          <h1 style={{ fontSize: "34px", marginBottom: "24px", color: "#1c1917" }}>
             New Quote
           </h1>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Client Name</label>
-            <input
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              style={inputStyle}
-            />
+            <input value={clientName} onChange={(e) => setClientName(e.target.value)} style={inputStyle} />
           </div>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Project Address</label>
-            <input
-              value={projectAddress}
-              onChange={(e) => setProjectAddress(e.target.value)}
-              style={inputStyle}
-            />
+            <input value={projectAddress} onChange={(e) => setProjectAddress(e.target.value)} style={inputStyle} />
           </div>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Contact Info</label>
-            <input
-              value={contactInfo}
-              onChange={(e) => setContactInfo(e.target.value)}
-              style={inputStyle}
-            />
+            <input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} style={inputStyle} />
           </div>
 
           <div style={twoColumn}>
             <div style={fieldGroup}>
               <label style={labelStyle}>Quote Number</label>
-              <input
-                value={quoteNumber}
-                onChange={(e) => setQuoteNumber(e.target.value)}
-                style={inputStyle}
-              />
+              <input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} style={inputStyle} />
             </div>
 
             <div style={fieldGroup}>
               <label style={labelStyle}>Quote Date</label>
-              <input
-                type="date"
-                value={quoteDate}
-                onChange={(e) => setQuoteDate(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="date" value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} style={inputStyle} />
             </div>
           </div>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Project Total</label>
-            <input
-              value={projectTotal}
-              onChange={(e) => setProjectTotal(e.target.value)}
-              style={inputStyle}
-            />
+            <input value={projectTotal} onChange={(e) => setProjectTotal(e.target.value)} style={inputStyle} />
           </div>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Estimated Start Window</label>
-            <input
-              value={startWindow}
-              onChange={(e) => setStartWindow(e.target.value)}
-              style={inputStyle}
-            />
+            <input value={startWindow} onChange={(e) => setStartWindow(e.target.value)} style={inputStyle} />
           </div>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Scope of Work</label>
-            <textarea
-              value={scopeOfWork}
-              onChange={(e) => setScopeOfWork(e.target.value)}
-              rows={10}
-              style={textareaStyle}
-            />
+            <textarea value={scopeOfWork} onChange={(e) => setScopeOfWork(e.target.value)} rows={10} style={textareaStyle} />
           </div>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Project Photo</label>
             <input type="file" accept="image/*" onChange={handlePhotoUpload} />
           </div>
+
+          {bannerImage && (
+            <img
+              src={bannerImage}
+              alt="Preview"
+              style={{
+                width: "100%",
+                maxHeight: "260px",
+                objectFit: "cover",
+                borderRadius: "14px",
+                marginBottom: "20px",
+                border: "1px solid #e7e5e4",
+              }}
+            />
+          )}
 
           <div
             style={{
@@ -275,51 +268,27 @@ export default function NewQuotePage() {
             </div>
 
             <label style={toggleStyle}>
-              <input
-                type="checkbox"
-                checked={includePaymentTerms}
-                onChange={(e) => setIncludePaymentTerms(e.target.checked)}
-              />
+              <input type="checkbox" checked={includePaymentTerms} onChange={(e) => setIncludePaymentTerms(e.target.checked)} />
               Include Payment Terms
             </label>
 
             <label style={toggleStyle}>
-              <input
-                type="checkbox"
-                checked={includeWeatherDisclaimer}
-                onChange={(e) =>
-                  setIncludeWeatherDisclaimer(e.target.checked)
-                }
-              />
+              <input type="checkbox" checked={includeWeatherDisclaimer} onChange={(e) => setIncludeWeatherDisclaimer(e.target.checked)} />
               Include Weather / Schedule Disclaimer
             </label>
 
             <label style={toggleStyle}>
-              <input
-                type="checkbox"
-                checked={includeScopeDisclaimer}
-                onChange={(e) => setIncludeScopeDisclaimer(e.target.checked)}
-              />
+              <input type="checkbox" checked={includeScopeDisclaimer} onChange={(e) => setIncludeScopeDisclaimer(e.target.checked)} />
               Include Scope Boundary Disclaimer
             </label>
 
             <label style={toggleStyle}>
-              <input
-                type="checkbox"
-                checked={includeDepositNote}
-                onChange={(e) => setIncludeDepositNote(e.target.checked)}
-              />
+              <input type="checkbox" checked={includeDepositNote} onChange={(e) => setIncludeDepositNote(e.target.checked)} />
               Include Deposit Required Note
             </label>
 
             <label style={toggleStyle}>
-              <input
-                type="checkbox"
-                checked={includeAcceptanceLanguage}
-                onChange={(e) =>
-                  setIncludeAcceptanceLanguage(e.target.checked)
-                }
-              />
+              <input type="checkbox" checked={includeAcceptanceLanguage} onChange={(e) => setIncludeAcceptanceLanguage(e.target.checked)} />
               Include Acceptance Language
             </label>
           </div>
