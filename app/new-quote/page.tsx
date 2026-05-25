@@ -1,302 +1,130 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-type SavedClient = {
-  name: string;
-  address: string;
-  contact: string;
-};
-
-type QuoteItem = {
-  id: string;
-  quoteNumber?: string;
-  clientName?: string;
-  projectAddress?: string;
-  contactInfo?: string;
-  quoteDate?: string;
-  projectTotal?: string;
-  startWindow?: string;
-  scopeOfWork?: string;
-  bannerImage?: string;
-  status?: "Draft" | "Sent" | "Approved" | "Archived";
-};
+import { useEffect, useState } from "react";
 
 export default function NewQuotePage() {
-  const [editingId, setEditingId] = useState("");
-  const [editingStatus, setEditingStatus] = useState<QuoteItem["status"]>("Draft");
-
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [contactInfo, setContactInfo] = useState("");
-  const [quoteDate, setQuoteDate] = useState("");
   const [quoteNumber, setQuoteNumber] = useState("");
+  const [quoteDate, setQuoteDate] = useState("");
   const [projectTotal, setProjectTotal] = useState("");
   const [startWindow, setStartWindow] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
   const [bannerImage, setBannerImage] = useState("");
-  const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
 
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  // Terms Toggles
+  const [includePaymentTerms, setIncludePaymentTerms] = useState(true);
+  const [includeWeatherDisclaimer, setIncludeWeatherDisclaimer] =
+    useState(true);
+  const [includeScopeDisclaimer, setIncludeScopeDisclaimer] =
+    useState(true);
+  const [includeDepositNote, setIncludeDepositNote] = useState(false);
 
   useEffect(() => {
-    const editData = localStorage.getItem("quotesnapEditDraft");
+    const savedDraft =
+      localStorage.getItem("quotesnapEditDraft");
 
-    if (editData) {
-      const parsed: QuoteItem = JSON.parse(editData);
+    if (savedDraft) {
+      const draft = JSON.parse(savedDraft);
 
-      const isDuplicate = !parsed.quoteNumber;
+      setClientName(draft.clientName || "");
+      setProjectAddress(draft.projectAddress || "");
+      setContactInfo(draft.contactInfo || "");
+      setQuoteNumber(draft.quoteNumber || "");
+      setQuoteDate(draft.quoteDate || "");
+      setProjectTotal(draft.projectTotal || "");
+      setStartWindow(draft.startWindow || "");
+      setScopeOfWork(draft.scopeOfWork || "");
+      setBannerImage(draft.bannerImage || "");
 
-      if (!isDuplicate && parsed.id) {
-        setEditingId(parsed.id);
-        setEditingStatus(parsed.status || "Draft");
-      } else {
-        setEditingId("");
-        setEditingStatus("Draft");
-      }
+      setIncludePaymentTerms(
+        draft.includePaymentTerms ?? true
+      );
 
-      setClientName(parsed.clientName || "");
-      setProjectAddress(parsed.projectAddress || "");
-      setContactInfo(parsed.contactInfo || "");
-      setQuoteDate(parsed.quoteDate || getTodayDate());
-      setQuoteNumber(parsed.quoteNumber || generateQuoteNumber());
-      setProjectTotal(parsed.projectTotal || "");
-      setStartWindow(parsed.startWindow || "");
-      setScopeOfWork(parsed.scopeOfWork || "");
-      setBannerImage(parsed.bannerImage || "");
+      setIncludeWeatherDisclaimer(
+        draft.includeWeatherDisclaimer ?? true
+      );
 
-      localStorage.removeItem("quotesnapEditDraft");
+      setIncludeScopeDisclaimer(
+        draft.includeScopeDisclaimer ?? true
+      );
+
+      setIncludeDepositNote(
+        draft.includeDepositNote ?? false
+      );
     } else {
-      setQuoteDate(getTodayDate());
-      setQuoteNumber(generateQuoteNumber());
+      setQuoteDate(new Date().toISOString().slice(0, 10));
     }
-
-    loadSavedClients();
   }, []);
 
-  function loadSavedClients() {
-    const activeQuotes: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
-
-    const archivedQuotes: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapArchivedQuotes") || "[]"
-    );
-
-    const quotes = [...activeQuotes, ...archivedQuotes];
-
-    const clientMap = new Map<string, SavedClient>();
-
-    for (const quote of quotes) {
-      const name = String(quote.clientName || "").trim();
-      if (!name) continue;
-
-      if (!clientMap.has(name.toLowerCase())) {
-        clientMap.set(name.toLowerCase(), {
-          name,
-          address: String(quote.projectAddress || ""),
-          contact: String(quote.contactInfo || ""),
-        });
-      }
-    }
-
-    setSavedClients(Array.from(clientMap.values()));
-  }
-
-  function getTodayDate() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  function generateQuoteNumber() {
-    const year = new Date().getFullYear();
-
-    const activeQuotes: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
-    );
-
-    const archivedQuotes: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapArchivedQuotes") || "[]"
-    );
-
-    const allQuotes = [...activeQuotes, ...archivedQuotes];
-
-    const currentYearQuotes = allQuotes.filter((q) =>
-      String(q.quoteNumber || "").startsWith(`IR-${year}-`)
-    );
-
-    const numbers = currentYearQuotes
-      .map((q) => {
-        const match = String(q.quoteNumber).match(/IR-\d{4}-(\d+)/);
-        return match ? Number(match[1]) : 0;
-      })
-      .filter((n) => n > 0);
-
-    const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
-
-    return `IR-${year}-${String(nextNumber).padStart(3, "0")}`;
-  }
-
-  function resizeImage(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const img = new Image();
-
-        img.onload = () => {
-          const maxWidth = 1400;
-          const maxHeight = 900;
-
-          let { width, height } = img;
-
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            reject(new Error("Could not create canvas context."));
-            return;
-          }
-
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const compressed = canvas.toDataURL("image/jpeg", 0.72);
-          resolve(compressed);
-        };
-
-        img.onerror = () => reject(new Error("Could not load image."));
-        img.src = reader.result as string;
-      };
-
-      reader.onerror = () => reject(new Error("Could not read file."));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function handleImageUpload(
+  function handlePhotoUpload(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     const file = event.target.files?.[0];
+
     if (!file) return;
 
-    try {
-      const compressedImage = await resizeImage(file);
-      setBannerImage(compressedImage);
-    } catch {
-      alert("That image could not be processed.");
-    } finally {
-      event.target.value = "";
-    }
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = reader.result as string;
+
+      setBannerImage(result);
+
+      const link = document.createElement("a");
+      link.href = result;
+      link.download = `quotesnap-photo-${Date.now()}.jpg`;
+      link.click();
+    };
+
+    reader.readAsDataURL(file);
   }
 
-  function formatCurrencyInput(value: string) {
-    const digitsOnly = value.replace(/\D/g, "");
-
-    if (!digitsOnly) return "";
-
-    const numberValue = Number(digitsOnly);
-
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(numberValue);
-  }
-
-  function handleProjectTotalChange(value: string) {
-    setProjectTotal(formatCurrencyInput(value));
-  }
-
-  function applyClientAutofill(nameValue: string) {
-    const match = savedClients.find(
-      (client) => client.name.toLowerCase() === nameValue.trim().toLowerCase()
-    );
-
-    if (!match) return;
-
-    setClientName(match.name);
-    setProjectAddress(match.address || "");
-    setContactInfo(match.contact || "");
-  }
-
-  function handleClientNameChange(value: string) {
-    setClientName(value);
-
-    const exactMatch = savedClients.find(
-      (client) => client.name.toLowerCase() === value.trim().toLowerCase()
-    );
-
-    if (exactMatch) {
-      setProjectAddress(exactMatch.address || "");
-      setContactInfo(exactMatch.contact || "");
-    }
-  }
-
-  function selectSavedClient(client: SavedClient) {
-    setClientName(client.name);
-    setProjectAddress(client.address || "");
-    setContactInfo(client.contact || "");
-  }
-
-  function handlePreview() {
-    const quoteData: QuoteItem = {
-      id: editingId || Date.now().toString(),
-      quoteNumber,
+  function saveQuote() {
+    const quoteData = {
+      id: Date.now().toString(),
       clientName,
       projectAddress,
       contactInfo,
+      quoteNumber,
       quoteDate,
       projectTotal,
       startWindow,
       scopeOfWork,
       bannerImage,
-      status: editingStatus || "Draft",
+
+      includePaymentTerms,
+      includeWeatherDisclaimer,
+      includeScopeDisclaimer,
+      includeDepositNote,
     };
 
-    try {
-      localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
-    } catch {
-      alert(
-        "This quote is too large to save in the browser. Try a smaller photo."
-      );
-      return;
-    }
-
-    const activeQuotes: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapActiveQuotes") || "[]"
+    localStorage.setItem(
+      "quotesnapDraft",
+      JSON.stringify(quoteData)
     );
 
-    const archivedQuotes: QuoteItem[] = JSON.parse(
-      localStorage.getItem("quotesnapArchivedQuotes") || "[]"
+    const existingQuotes = JSON.parse(
+      localStorage.getItem("quotesnapSavedQuotes") || "[]"
     );
 
-    const nextActiveQuotes = activeQuotes.filter((q) => q.id !== quoteData.id);
-    const nextArchivedQuotes = archivedQuotes.filter((q) => q.id !== quoteData.id);
+    const existingIndex = existingQuotes.findIndex(
+      (q: any) => q.quoteNumber === quoteNumber
+    );
 
-    if (quoteData.status === "Archived") {
-      nextArchivedQuotes.unshift(quoteData);
+    if (existingIndex >= 0) {
+      existingQuotes[existingIndex] = quoteData;
     } else {
-      nextActiveQuotes.unshift(quoteData);
+      existingQuotes.push(quoteData);
     }
 
-    localStorage.setItem("quotesnapActiveQuotes", JSON.stringify(nextActiveQuotes));
-    localStorage.setItem("quotesnapArchivedQuotes", JSON.stringify(nextArchivedQuotes));
+    localStorage.setItem(
+      "quotesnapSavedQuotes",
+      JSON.stringify(existingQuotes)
+    );
+
+    localStorage.removeItem("quotesnapEditDraft");
 
     window.location.href = "/preview";
   }
@@ -305,351 +133,308 @@ export default function NewQuotePage() {
     window.location.href = "/";
   }
 
-  const recentClients = savedClients.slice(0, 6);
-  const isEditing = Boolean(editingId);
-
   return (
     <main
       style={{
         minHeight: "100vh",
-        background: "#f5f5f4",
+        background:
+          "linear-gradient(180deg, #f5f5f4 0%, #ede9e7 100%)",
+        padding: "24px 18px 40px",
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-          padding: "24px 20px 40px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-            marginBottom: "18px",
-          }}
+      <div style={{ maxWidth: "860px", margin: "0 auto" }}>
+        <button
+          onClick={goHome}
+          style={secondaryButton}
         >
-          <button
-            type="button"
-            onClick={goHome}
-            style={topButton("#e7e5e4", "#1c1917")}
-          >
-            Home
-          </button>
-        </div>
-
-        <h1
-          style={{
-            fontSize: "36px",
-            fontWeight: "bold",
-            marginBottom: "10px",
-            color: "#1c1917",
-          }}
-        >
-          {isEditing ? "Edit Quote" : "New Quote"}
-        </h1>
-
-        <p
-          style={{
-            fontSize: "18px",
-            color: "#57534e",
-            marginBottom: "30px",
-          }}
-        >
-          {isEditing
-            ? "Update the project details below and save the existing quote."
-            : "Enter the project details below to build a quote."}
-        </p>
+          Home
+        </button>
 
         <div
           style={{
-            background: "white",
-            padding: "24px",
-            borderRadius: "14px",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+            background: "#ffffff",
+            borderRadius: "20px",
             border: "1px solid #e7e5e4",
+            boxShadow: "0 16px 40px rgba(0,0,0,0.10)",
+            padding: "28px 22px 24px",
           }}
         >
-          <div
+          <h1
             style={{
-              display: "grid",
-              gap: "18px",
+              fontSize: "34px",
+              marginBottom: "24px",
+              color: "#1c1917",
             }}
           >
-            <div>
-              <label style={labelStyle}>Banner Photo</label>
+            New Quote
+          </h1>
 
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Client Name</label>
+            <input
+              value={clientName}
+              onChange={(e) =>
+                setClientName(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Project Address
+            </label>
+            <input
+              value={projectAddress}
+              onChange={(e) =>
+                setProjectAddress(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Contact Info</label>
+            <input
+              value={contactInfo}
+              onChange={(e) =>
+                setContactInfo(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={twoColumn}>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>
+                Quote Number
+              </label>
               <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageUpload}
-                style={{ display: "none" }}
-              />
-
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                style={{ display: "none" }}
-              />
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                  marginBottom: "12px",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  style={topButton("#1c1917", "#ffffff")}
-                >
-                  Take Job Photo
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  style={topButton("#57534e", "#ffffff")}
-                >
-                  Choose Existing Photo
-                </button>
-              </div>
-
-              {bannerImage && (
-                <div style={{ marginTop: "12px" }}>
-                  <img
-                    src={bannerImage}
-                    alt="Banner preview"
-                    style={{
-                      width: "100%",
-                      maxHeight: "220px",
-                      objectFit: "cover",
-                      borderRadius: "10px",
-                      border: "1px solid #d6d3d1",
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                padding: "12px 14px",
-                background: "#fff7ed",
-                border: "1px solid #fdba74",
-                borderRadius: "10px",
-                color: "#9a3412",
-                fontSize: "14px",
-              }}
-            >
-              Company COI will be attached automatically from <strong>/public/coi.pdf</strong>.
-            </div>
-
-            <div>
-              <label style={labelStyle}>Quote Number</label>
-              <input
-                type="text"
                 value={quoteNumber}
-                readOnly
-                style={{
-                  ...inputStyle,
-                  background: "#fafaf9",
-                  color: "#57534e",
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Client Name</label>
-              <input
-                type="text"
-                placeholder="John Smith"
-                value={clientName}
-                onChange={(e) => handleClientNameChange(e.target.value)}
-                onBlur={(e) => applyClientAutofill(e.target.value)}
-                style={inputStyle}
-                list="saved-clients"
-              />
-              <datalist id="saved-clients">
-                {savedClients.map((client) => (
-                  <option key={client.name} value={client.name} />
-                ))}
-              </datalist>
-
-              {recentClients.length > 0 && (
-                <div style={{ marginTop: "10px" }}>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      color: "#78716c",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    Recent Clients
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {recentClients.map((client) => (
-                      <button
-                        key={client.name}
-                        type="button"
-                        onClick={() => selectSavedClient(client)}
-                        style={{
-                          padding: "7px 10px",
-                          borderRadius: "999px",
-                          border: "1px solid #fdba74",
-                          background: "#fff7ed",
-                          color: "#9a3412",
-                          fontSize: "13px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {client.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label style={labelStyle}>Project Address</label>
-              <input
-                type="text"
-                placeholder="123 Gravel Rd, New Castle, KY"
-                value={projectAddress}
-                onChange={(e) => setProjectAddress(e.target.value)}
+                onChange={(e) =>
+                  setQuoteNumber(e.target.value)
+                }
                 style={inputStyle}
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>Phone / Email</label>
-              <input
-                type="text"
-                placeholder="(555) 555-5555 / john@email.com"
-                value={contactInfo}
-                onChange={(e) => setContactInfo(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Date</label>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>Quote Date</label>
               <input
                 type="date"
                 value={quoteDate}
-                onChange={(e) => setQuoteDate(e.target.value)}
+                onChange={(e) =>
+                  setQuoteDate(e.target.value)
+                }
                 style={inputStyle}
               />
             </div>
+          </div>
 
-            <div>
-              <label style={labelStyle}>Project Total</label>
-              <input
-                type="text"
-                placeholder="$4,800"
-                value={projectTotal}
-                onChange={(e) => handleProjectTotalChange(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Project Total
+            </label>
+            <input
+              value={projectTotal}
+              onChange={(e) =>
+                setProjectTotal(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
 
-            <div>
-              <label style={labelStyle}>Estimated Start Window</label>
-              <input
-                type="text"
-                placeholder="2–3 weeks after approval"
-                value={startWindow}
-                onChange={(e) => setStartWindow(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Estimated Start Window
+            </label>
+            <input
+              value={startWindow}
+              onChange={(e) =>
+                setStartWindow(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
 
-            <div>
-              <label style={labelStyle}>Scope of Work</label>
-              <textarea
-                placeholder="• Power rake existing gravel driveway surface&#10;• Add and spread 20 tons of DGA&#10;• Compact with vibratory roller"
-                rows={8}
-                value={scopeOfWork}
-                onChange={(e) => setScopeOfWork(e.target.value)}
-                style={textAreaStyle}
-              />
-            </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Scope of Work
+            </label>
 
-            <button
-              type="button"
-              onClick={handlePreview}
+            <textarea
+              value={scopeOfWork}
+              onChange={(e) =>
+                setScopeOfWork(e.target.value)
+              }
+              rows={10}
+              style={textareaStyle}
+            />
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Project Photo
+            </label>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+            />
+          </div>
+
+          {/* Terms Section */}
+
+          <div
+            style={{
+              marginTop: "24px",
+              background: "#fafaf9",
+              border: "1px solid #e7e5e4",
+              borderRadius: "16px",
+              padding: "18px",
+            }}
+          >
+            <div
               style={{
-                background: "#f97316",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                padding: "14px 18px",
-                fontSize: "16px",
+                fontSize: "20px",
                 fontWeight: "bold",
-                cursor: "pointer",
+                marginBottom: "16px",
+                color: "#1c1917",
               }}
             >
-              {isEditing ? "Update Quote" : "Preview Quote"}
-            </button>
+              Quote Terms & Notes
+            </div>
+
+            <label style={toggleStyle}>
+              <input
+                type="checkbox"
+                checked={includePaymentTerms}
+                onChange={(e) =>
+                  setIncludePaymentTerms(
+                    e.target.checked
+                  )
+                }
+              />
+              Include Payment Terms
+            </label>
+
+            <label style={toggleStyle}>
+              <input
+                type="checkbox"
+                checked={includeWeatherDisclaimer}
+                onChange={(e) =>
+                  setIncludeWeatherDisclaimer(
+                    e.target.checked
+                  )
+                }
+              />
+              Include Weather / Schedule Disclaimer
+            </label>
+
+            <label style={toggleStyle}>
+              <input
+                type="checkbox"
+                checked={includeScopeDisclaimer}
+                onChange={(e) =>
+                  setIncludeScopeDisclaimer(
+                    e.target.checked
+                  )
+                }
+              />
+              Include Scope Boundary Disclaimer
+            </label>
+
+            <label style={toggleStyle}>
+              <input
+                type="checkbox"
+                checked={includeDepositNote}
+                onChange={(e) =>
+                  setIncludeDepositNote(
+                    e.target.checked
+                  )
+                }
+              />
+              Include Deposit Required Note
+            </label>
           </div>
+
+          <button
+            onClick={saveQuote}
+            style={{
+              ...primaryButton,
+              marginTop: "26px",
+            }}
+          >
+            Preview Quote
+          </button>
         </div>
       </div>
     </main>
   );
 }
 
-function topButton(background: string, color: string) {
-  return {
-    padding: "12px 18px",
-    fontSize: "15px",
-    borderRadius: "8px",
-    border: "none",
-    background,
-    color,
-    cursor: "pointer",
-    fontWeight: "bold" as const,
-  };
-}
+const fieldGroup = {
+  marginBottom: "18px",
+};
 
 const labelStyle = {
   display: "block",
-  marginBottom: "6px",
-  fontWeight: "bold",
-  color: "#1c1917",
+  marginBottom: "8px",
+  fontWeight: "bold" as const,
+  color: "#292524",
 };
 
 const inputStyle = {
   width: "100%",
-  padding: "12px",
-  borderRadius: "8px",
+  padding: "14px",
+  borderRadius: "12px",
   border: "1px solid #d6d3d1",
   fontSize: "16px",
   boxSizing: "border-box" as const,
 };
 
-const textAreaStyle = {
-  width: "100%",
-  padding: "12px",
-  borderRadius: "8px",
-  border: "1px solid #d6d3d1",
-  fontSize: "16px",
-  boxSizing: "border-box" as const,
+const textareaStyle = {
+  ...inputStyle,
+  minHeight: "220px",
   resize: "vertical" as const,
+};
+
+const twoColumn = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "14px",
+};
+
+const primaryButton = {
+  width: "100%",
+  padding: "16px",
+  borderRadius: "12px",
+  border: "none",
+  background: "#f97316",
+  color: "#ffffff",
+  fontSize: "16px",
+  fontWeight: "bold" as const,
+  cursor: "pointer",
+};
+
+const secondaryButton = {
+  marginBottom: "20px",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  border: "1px solid #d6d3d1",
+  background: "#ffffff",
+  color: "#1c1917",
+  cursor: "pointer",
+  fontWeight: "bold" as const,
+};
+
+const toggleStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  marginBottom: "12px",
+  fontSize: "15px",
+  color: "#292524",
 };
