@@ -28,10 +28,14 @@ const OLD_JOB_KEYS = [
   "quotesnapApprovedQuotes",
 ];
 
-export default function HomePage() {
-  useEffect(() => {
+useEffect(() => {
+  try {
     recoverOldCurrentJobs();
-  }, []);
+  } catch (error) {
+    console.error("QuoteSnap recovery skipped because storage data was bad:", error);
+    localStorage.setItem("quotesnapRecoveryError", "true");
+  }
+}, []);
 
   function safelyReadArray(key: string): QuoteItem[] {
     try {
