@@ -27,7 +27,7 @@ const OLD_JOB_KEYS = [
   "quotesnapCurrentJobs",
   "quotesnapApprovedQuotes",
 ];
-
+export default function HomePage() {
 useEffect(() => {
   try {
     recoverOldCurrentJobs();
