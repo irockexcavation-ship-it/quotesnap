@@ -26,6 +26,7 @@ type QuoteItem = {
 };
 
 const SAVED_KEY = "quotesnapSavedQuotes";
+const OLD_ACTIVE_KEY = "quotesnapActiveQuotes";
 const ARCHIVE_KEY = "quotesnapArchivedQuotes";
 const DRAFT_KEY = "quotesnapDraft";
 
@@ -36,24 +37,28 @@ export default function CurrentJobsPage() {
     loadJobs();
   }, []);
 
-  function getSavedQuotes(): QuoteItem[] {
-    return JSON.parse(localStorage.getItem(SAVED_KEY) || "[]");
+  function safeRead(key: string): QuoteItem[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 
-  function saveSavedQuotes(quotes: QuoteItem[]) {
-    localStorage.setItem(SAVED_KEY, JSON.stringify(quotes));
+  function safeWrite(key: string, quotes: QuoteItem[]) {
+    localStorage.setItem(key, JSON.stringify(quotes));
   }
 
-  function getArchivedQuotes(): QuoteItem[] {
-    return JSON.parse(localStorage.getItem(ARCHIVE_KEY) || "[]");
-  }
-
-  function saveArchivedQuotes(quotes: QuoteItem[]) {
-    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(quotes));
+  function sameQuote(a: QuoteItem, b: QuoteItem) {
+    return (
+      (a.id && b.id && a.id === b.id) ||
+      (a.quoteNumber && b.quoteNumber && a.quoteNumber === b.quoteNumber)
+    );
   }
 
   function loadJobs() {
-    const savedQuotes = getSavedQuotes();
+    const savedQuotes = safeRead(SAVED_KEY);
 
     const approvedJobs = savedQuotes
       .filter((quote) => quote.status === "Approved")
@@ -73,16 +78,20 @@ export default function CurrentJobsPage() {
     window.location.href = "/quotes";
   }
 
+  function goArchive() {
+    window.location.href = "/archive";
+  }
+
   function openJob(job: QuoteItem) {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(job));
     window.location.href = "/preview";
   }
 
   function returnToQuotes(job: QuoteItem) {
-    const savedQuotes = getSavedQuotes();
+    const savedQuotes = safeRead(SAVED_KEY);
 
-    const updatedQuotes = savedQuotes.map((quote) => {
-      if (quote.id !== job.id) return quote;
+    const updatedSaved = savedQuotes.map((quote) => {
+      if (!sameQuote(quote, job)) return quote;
 
       return {
         ...quote,
@@ -92,15 +101,20 @@ export default function CurrentJobsPage() {
       };
     });
 
-    saveSavedQuotes(updatedQuotes);
+    safeWrite(SAVED_KEY, updatedSaved);
+
+    const oldActive = safeRead(OLD_ACTIVE_KEY);
+    const updatedOldActive = oldActive.filter((quote) => !sameQuote(quote, job));
+    safeWrite(OLD_ACTIVE_KEY, updatedOldActive);
+
     loadJobs();
   }
 
   function markPaid(job: QuoteItem) {
-    const savedQuotes = getSavedQuotes();
+    const savedQuotes = safeRead(SAVED_KEY);
 
-    const updatedQuotes = savedQuotes.map((quote) => {
-      if (quote.id !== job.id) return quote;
+    const updatedSaved = savedQuotes.map((quote) => {
+      if (!sameQuote(quote, job)) return quote;
 
       return {
         ...quote,
@@ -108,15 +122,15 @@ export default function CurrentJobsPage() {
       };
     });
 
-    saveSavedQuotes(updatedQuotes);
+    safeWrite(SAVED_KEY, updatedSaved);
     loadJobs();
   }
 
   function markUnpaid(job: QuoteItem) {
-    const savedQuotes = getSavedQuotes();
+    const savedQuotes = safeRead(SAVED_KEY);
 
-    const updatedQuotes = savedQuotes.map((quote) => {
-      if (quote.id !== job.id) return quote;
+    const updatedSaved = savedQuotes.map((quote) => {
+      if (!sameQuote(quote, job)) return quote;
 
       return {
         ...quote,
@@ -124,33 +138,47 @@ export default function CurrentJobsPage() {
       };
     });
 
-    saveSavedQuotes(updatedQuotes);
+    safeWrite(SAVED_KEY, updatedSaved);
     loadJobs();
   }
 
-  function archiveJob(job: QuoteItem) {
+  function completeJob(job: QuoteItem) {
     const confirmed = window.confirm(
-      `Archive completed job for ${job.clientName || "this client"}?`
+      `Mark job completed and move to archive for ${
+        job.clientName || "this client"
+      }?`
     );
 
     if (!confirmed) return;
 
-    const savedQuotes = getSavedQuotes();
+    const savedQuotes = safeRead(SAVED_KEY);
+    const oldActiveQuotes = safeRead(OLD_ACTIVE_KEY);
+    const archivedQuotes = safeRead(ARCHIVE_KEY);
 
-    const remainingQuotes = savedQuotes.filter((quote) => quote.id !== job.id);
+    const remainingSaved = savedQuotes.filter((quote) => !sameQuote(quote, job));
+    const remainingOldActive = oldActiveQuotes.filter(
+      (quote) => !sameQuote(quote, job)
+    );
 
-    const archivedJob: QuoteItem = {
+    const alreadyArchived = archivedQuotes.some((quote) =>
+      sameQuote(quote, job)
+    );
+
+    const completedJob: QuoteItem = {
       ...job,
       status: "Archived",
-      completedAt: new Date().toISOString(),
+      paymentStatus: job.paymentStatus || "Unpaid",
+      completedAt: job.completedAt || new Date().toISOString(),
       archivedAt: new Date().toISOString(),
       archiveReason: "Completed job",
     };
 
-    const archivedQuotes = getArchivedQuotes();
+    safeWrite(SAVED_KEY, remainingSaved);
+    safeWrite(OLD_ACTIVE_KEY, remainingOldActive);
 
-    saveSavedQuotes(remainingQuotes);
-    saveArchivedQuotes([archivedJob, ...archivedQuotes]);
+    if (!alreadyArchived) {
+      safeWrite(ARCHIVE_KEY, [completedJob, ...archivedQuotes]);
+    }
 
     loadJobs();
   }
@@ -179,6 +207,10 @@ export default function CurrentJobsPage() {
 
           <button onClick={goQuotes} style={navButton}>
             Quotes
+          </button>
+
+          <button onClick={goArchive} style={navButton}>
+            Archive
           </button>
         </div>
 
@@ -210,8 +242,8 @@ export default function CurrentJobsPage() {
               lineHeight: 1.5,
             }}
           >
-            Approved quotes live here. Return them to Quotes, mark payment status,
-            open the job, or archive when completed.
+            Approved quotes live here. Complete jobs move to Archive and stay
+            there. No more zombie quotes, ideally. What a concept.
           </p>
 
           {jobs.length === 0 ? (
@@ -228,15 +260,10 @@ export default function CurrentJobsPage() {
               No current jobs found.
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gap: "14px",
-              }}
-            >
+            <div style={{ display: "grid", gap: "14px" }}>
               {jobs.map((job) => (
                 <div
-                  key={job.id}
+                  key={job.id || job.quoteNumber}
                   style={{
                     background: "#ffffff",
                     border: "1px solid #e7e5e4",
@@ -312,26 +339,46 @@ export default function CurrentJobsPage() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <button type="button" onClick={() => openJob(job)} style={smallButton("#1c1917", "#ffffff")}>
+                    <button
+                      type="button"
+                      onClick={() => openJob(job)}
+                      style={smallButton("#1c1917", "#ffffff")}
+                    >
                       Open
                     </button>
 
-                    <button type="button" onClick={() => returnToQuotes(job)} style={smallButton("#f97316", "#ffffff")}>
+                    <button
+                      type="button"
+                      onClick={() => returnToQuotes(job)}
+                      style={smallButton("#f97316", "#ffffff")}
+                    >
                       Return to Quotes
                     </button>
 
                     {job.paymentStatus === "Paid" ? (
-                      <button type="button" onClick={() => markUnpaid(job)} style={smallButton("#fee2e2", "#991b1b", "#fecaca")}>
+                      <button
+                        type="button"
+                        onClick={() => markUnpaid(job)}
+                        style={smallButton("#fee2e2", "#991b1b", "#fecaca")}
+                      >
                         Mark Unpaid
                       </button>
                     ) : (
-                      <button type="button" onClick={() => markPaid(job)} style={smallButton("#dcfce7", "#166534", "#86efac")}>
+                      <button
+                        type="button"
+                        onClick={() => markPaid(job)}
+                        style={smallButton("#dcfce7", "#166534", "#86efac")}
+                      >
                         Mark Paid
                       </button>
                     )}
 
-                    <button type="button" onClick={() => archiveJob(job)} style={smallButton("#57534e", "#ffffff")}>
-                      Archive Job
+                    <button
+                      type="button"
+                      onClick={() => completeJob(job)}
+                      style={smallButton("#57534e", "#ffffff")}
+                    >
+                      Job Completed
                     </button>
                   </div>
                 </div>
