@@ -154,6 +154,7 @@ export default function NewQuotePage() {
     window.location.href = "/preview";
   }
 
+  
   function goHome() {
     window.location.href = "/";
   }
