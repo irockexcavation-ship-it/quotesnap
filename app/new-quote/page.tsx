@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { supabase } from "../../lib/supabase";
 export default function NewQuotePage() {
   const [quoteId, setQuoteId] = useState("");
   const [clientName, setClientName] = useState("");
