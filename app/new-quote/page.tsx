@@ -21,7 +21,8 @@ export default function NewQuotePage() {
   const [includeDepositNote, setIncludeDepositNote] = useState(false);
   const [includeAcceptanceLanguage, setIncludeAcceptanceLanguage] = useState(true);
 
-  useEffect(() => {
+useEffect(() => {
+  async function loadDraft() {
     const savedDraft = localStorage.getItem("quotesnapEditDraft");
 
     if (savedDraft) {
@@ -31,7 +32,11 @@ export default function NewQuotePage() {
       setClientName(draft.clientName || "");
       setProjectAddress(draft.projectAddress || "");
       setContactInfo(draft.contactInfo || "");
-      setQuoteNumber(draft.quoteNumber || generateQuoteNumber());
+
+      const nextQuoteNumber =
+        draft.quoteNumber || (await generateQuoteNumber());
+      setQuoteNumber(nextQuoteNumber);
+
       setQuoteDate(draft.quoteDate || getToday());
       setProjectTotal(draft.projectTotal || "");
       setStartWindow(draft.startWindow || "");
@@ -46,31 +51,45 @@ export default function NewQuotePage() {
       setIncludeAcceptanceLanguage(draft.includeAcceptanceLanguage ?? true);
     } else {
       setQuoteId(Date.now().toString());
-      setQuoteNumber(generateQuoteNumber());
+      setQuoteNumber(await generateQuoteNumber());
       setQuoteDate(getToday());
       setStatus("Draft");
     }
-  }, []);
+  }
 
+  loadDraft();
+}, []);
   function getToday() {
     return new Date().toISOString().slice(0, 10);
   }
 
-  function generateQuoteNumber() {
-    const year = new Date().getFullYear();
+  async function generateQuoteNumber() {
+  const year = new Date().getFullYear();
+  const prefix = `IR-${year}-`;
 
-    const existingQuotes = JSON.parse(
-      localStorage.getItem("quotesnapSavedQuotes") || "[]"
-    );
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("quote_number")
+    .like("quote_number", `${prefix}%`);
 
-    const yearQuotes = existingQuotes.filter((q: any) =>
-      String(q.quoteNumber || "").startsWith(`IR-${year}-`)
-    );
-
-    const nextNumber = yearQuotes.length + 1;
-
-    return `IR-${year}-${String(nextNumber).padStart(3, "0")}`;
+  if (error) {
+    console.error("Could not generate quote number:", error);
+    return `${prefix}001`;
   }
+
+  const numbers = (data || [])
+    .map((q: any) => {
+      const value = String(q.quote_number || "");
+      const numberPart = value.replace(prefix, "");
+      return Number(numberPart);
+    })
+    .filter((n: number) => Number.isFinite(n));
+
+  const nextNumber =
+    numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+
+  return `${prefix}${String(nextNumber).padStart(3, "0")}`;
+}
 
   async function compressImage(file: File): Promise<string> {
     return new Promise((resolve) => {
