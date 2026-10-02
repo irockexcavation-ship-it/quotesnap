@@ -163,7 +163,7 @@ export default function NewQuotePage() {
         client_name: quoteData.clientName,
         project_address: quoteData.projectAddress,
         contact_info: quoteData.contactInfo,
-        quote_date: quoteData.quoteDate,
+       
        quote_date: quoteData.quoteDate,
 project_total: Number(
   String(quoteData.projectTotal || "0").replace(/[$,\s]/g, "")
