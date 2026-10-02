@@ -14,7 +14,7 @@
     "next": "16.1.6",
     "pdf-lib": "^1.17.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
     "@supabase/supabase-js": "^2.57.4"
   },
   "devDependencies": {
