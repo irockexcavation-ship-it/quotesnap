@@ -109,51 +109,84 @@ export default function NewQuotePage() {
     setBannerImage(compressed);
   }
 
-  function saveQuote() {
-    const quoteData = {
-      id: quoteId || Date.now().toString(),
-      clientName,
-      projectAddress,
-      contactInfo,
-      quoteNumber,
-      quoteDate,
-      projectTotal,
-      startWindow,
-      scopeOfWork,
-      bannerImage,
-      status: status || "Draft",
-      includePaymentTerms,
-      includeWeatherDisclaimer,
-      includeScopeDisclaimer,
-      includeDepositNote,
-      includeAcceptanceLanguage,
-    };
+  async function saveQuote() {
+  const quoteData = {
+    id: quoteId || Date.now().toString(),
+    clientName,
+    projectAddress,
+    contactInfo,
+    quoteNumber,
+    quoteDate,
+    projectTotal,
+    startWindow,
+    scopeOfWork,
+    bannerImage,
+    status: status || "Draft",
+    includePaymentTerms,
+    includeWeatherDisclaimer,
+    includeScopeDisclaimer,
+    includeDepositNote,
+    includeAcceptanceLanguage,
+  };
 
-    localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
+  // Keep this for the existing Preview page.
+  localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
 
-    const existingQuotes = JSON.parse(
-      localStorage.getItem("quotesnapSavedQuotes") || "[]"
-    );
+  const { data: userData, error: userError } =
+    await supabase.auth.getUser();
 
-    const existingIndex = existingQuotes.findIndex(
-      (q: any) => q.id === quoteData.id || q.quoteNumber === quoteData.quoteNumber
-    );
-
-    let updatedQuotes;
-
-    if (existingIndex >= 0) {
-      updatedQuotes = [...existingQuotes];
-      updatedQuotes[existingIndex] = quoteData;
-    } else {
-      updatedQuotes = [quoteData, ...existingQuotes];
-    }
-
-    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updatedQuotes));
-    localStorage.removeItem("quotesnapEditDraft");
-
-    window.location.href = "/preview";
+  if (userError || !userData.user) {
+    console.error("No logged-in user:", userError);
+    alert("You must be logged in to save a quote.");
+    return;
   }
 
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userData.user.id)
+    .single();
+
+  if (membershipError || !membership) {
+    console.error("Workspace lookup failed:", membershipError);
+    alert("Could not find your QuoteSnap workspace.");
+    return;
+  }
+
+  const { error: saveError } = await supabase
+    .from("quotes")
+    .upsert(
+      {
+        workspace_id: membership.workspace_id,
+        legacy_id: quoteData.id,
+        quote_number: quoteData.quoteNumber,
+        client_name: quoteData.clientName,
+        project_address: quoteData.projectAddress,
+        contact_info: quoteData.contactInfo,
+        quote_date: quoteData.quoteDate,
+        project_total: quoteData.projectTotal,
+        start_window: quoteData.startWindow,
+        scope_of_work: quoteData.scopeOfWork,
+        banner_image_url: quoteData.bannerImage,
+        status: quoteData.status,
+        include_payment_terms: quoteData.includePaymentTerms,
+        include_weather_disclaimer: quoteData.includeWeatherDisclaimer,
+        include_scope_disclaimer: quoteData.includeScopeDisclaimer,
+        include_deposit_note: quoteData.includeDepositNote,
+        include_acceptance_language: quoteData.includeAcceptanceLanguage,
+      },
+      { onConflict: "workspace_id,quote_number" }
+    );
+
+  if (saveError) {
+    console.error("Error saving quote to Supabase:", saveError);
+    alert("Quote could not be saved: " + saveError.message);
+    return;
+  }
+
+  localStorage.removeItem("quotesnapEditDraft");
+  window.location.href = "/preview";
+}
   
   function goHome() {
     window.location.href = "/";
