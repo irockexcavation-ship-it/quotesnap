@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
 
 type QuoteStatus = "Draft" | "Sent" | "Approved" | "Completed" | "Archived";
 
@@ -141,16 +142,38 @@ export default function QuotesPage() {
     );
   }
 
-  function loadQuotes() {
-    const stored = safeParseQuotes("quotesnapSavedQuotes");
-    const cleaned = dedupeQuotes(stored);
+ async function loadQuotes() {
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-    if (cleaned.length !== stored.length) {
-      localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(cleaned));
-    }
-
-    setQuotes([...cleaned].reverse());
+  if (error) {
+    console.error("Error loading quotes from Supabase:", error);
+    return;
   }
+
+  const loadedQuotes: QuoteItem[] = (data || []).map((quote) => ({
+    id: quote.id,
+    quoteNumber: quote.quote_number || "",
+    clientName: quote.client_name || "",
+    projectAddress: quote.project_address || "",
+    contactInfo: quote.contact_info || "",
+    quoteDate: quote.quote_date || "",
+    projectTotal: quote.project_total || "",
+    startWindow: quote.start_window || "",
+    scopeOfWork: quote.scope_of_work || "",
+    bannerImage: quote.banner_image || "",
+    status: quote.status || "Draft",
+    archivedAt: quote.archived_at || "",
+    completedAt: quote.completed_at || "",
+    sentAt: quote.sent_at || "",
+    approvedAt: quote.approved_at || "",
+    archiveReason: quote.archive_reason || "",
+  }));
+
+  setQuotes(loadedQuotes);
+}
 
   function saveActiveQuotes(updatedQuotes: QuoteItem[]) {
     const storageOrder = dedupeQuotes([...updatedQuotes].reverse());
