@@ -168,7 +168,7 @@ export default function NewQuotePage() {
 project_total: Number(
   String(quoteData.projectTotal || "0").replace(/[$,\s]/g, "")
 ),
-start_window: quoteData.startWindow,
+
         start_window: quoteData.startWindow,
         scope_of_work: quoteData.scopeOfWork,
         banner_image_url: quoteData.bannerImage,
