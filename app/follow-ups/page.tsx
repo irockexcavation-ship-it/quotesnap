@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 type FollowUp = {
   id: string;
   quote_id: string;
+  workspace_id: string;
   followup_number: number;
   due_at: string;
   status: string;
@@ -33,6 +34,7 @@ export default function FollowUpsPage() {
       .select(`
         id,
         quote_id,
+        workspace_id,
         followup_number,
         due_at,
         status,
@@ -102,6 +104,7 @@ function formatDateTime(date: string) {
       .from("quote_followups")
       .insert({
         quote_id: currentFollowUp.quote_id,
+        workspace_id: currentFollowUp.workspace_id,
         followup_number: 2,
         due_at: nextDueDate.toISOString(),
         status: "Pending",
