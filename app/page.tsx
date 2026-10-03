@@ -112,7 +112,9 @@ useEffect(() => {
   function openArchive() {
     window.location.href = "/archive";
   }
-
+function openFollowUps() {
+  window.location.href = "/follow-ups";
+}
   return (
     <main
       style={{
@@ -205,6 +207,9 @@ useEffect(() => {
           <button onClick={openArchive} style={secondaryButton}>
             Archive
           </button>
+        <button onClick={openFollowUps} style={secondaryButton}>
+  Follow-Ups
+</button>
         </div>
 
         <div
