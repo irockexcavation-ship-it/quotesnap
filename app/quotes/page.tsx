@@ -255,17 +255,43 @@ export default function QuotesPage() {
     updates.archive_reason = "Manually archived";
   }
 
-  const { error } = await supabase
-    .from("quotes")
-    .update(updates)
-    .eq("id", quoteToUpdate.id);
+ const { data: updatedQuote, error } = await supabase
+  .from("quotes")
+  .update(updates)
+  .eq("id", quoteToUpdate.id)
+  .select("id, workspace_id, sent_at")
+  .single();
 
   if (error) {
     console.error("Failed to update quote status:", error);
     alert("Quote status could not be updated.");
     return;
   }
+if (status === "Sent" && updatedQuote) {
+  const sentAt = new Date(updatedQuote.sent_at || now);
+  const dueAt = new Date(sentAt);
+  dueAt.setDate(dueAt.getDate() + 7);
 
+  const { error: followupError } = await supabase
+    .from("quote_followups")
+    .upsert(
+      {
+        workspace_id: updatedQuote.workspace_id,
+        quote_id: updatedQuote.id,
+        followup_number: 1,
+        due_at: dueAt.toISOString(),
+        status: "Pending",
+      },
+      {
+        onConflict: "quote_id,followup_number",
+        ignoreDuplicates: true,
+      }
+    );
+
+  if (followupError) {
+    console.error("Failed to create quote follow-up:", followupError);
+  }
+}
   await loadQuotes();
 }
 
