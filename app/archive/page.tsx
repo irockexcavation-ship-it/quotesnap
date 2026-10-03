@@ -132,48 +132,43 @@ async function loadArchivedQuotes() {
     window.location.href = "/preview";
   }
 
-  function restoreQuote(
-    quoteToRestore: QuoteItem,
-    status: "Draft" | "Approved"
-  ) {
-    const archived = safeParseQuotes("quotesnapArchivedQuotes");
-    const active = safeParseQuotes("quotesnapActiveQuotes");
+  async function restoreQuote(
+  quoteToRestore: QuoteItem,
+  status: "Draft" | "Approved"
+) {
+  const confirmed = window.confirm(
+    status === "Approved"
+      ? `Restore ${quoteToRestore.clientName || "this client"} to Current Jobs?`
+      : `Restore ${quoteToRestore.clientName || "this client"} to Quotes?`
+  );
 
-    const updatedArchived = archived.filter(
-      (q) => q.id !== quoteToRestore.id
-    );
+  if (!confirmed) return;
 
-    const cleanedActive = active.filter(
-      (q) => q.id !== quoteToRestore.id
-    );
-
-    cleanedActive.unshift({
-      ...quoteToRestore,
+  const { error } = await supabase
+    .from("quotes")
+    .update({
       status,
-      archivedAt: undefined,
-      completedAt: undefined,
-      archiveReason: undefined,
-      paymentStatus:
-        quoteToRestore.paymentStatus || "Unpaid",
-    });
+      archived_at: null,
+      archive_reason: null,
+      completed_at: null,
+    })
+    .eq("id", quoteToRestore.id);
 
-    localStorage.setItem(
-      "quotesnapArchivedQuotes",
-      JSON.stringify(updatedArchived)
-    );
-
-    localStorage.setItem(
-      "quotesnapActiveQuotes",
-      JSON.stringify(cleanedActive)
-    );
-
-    if (status === "Approved") {
-      window.location.href = "/current-jobs";
-      return;
-    }
-
-    window.location.href = "/quotes";
+  if (error) {
+    console.error("Failed to restore quote:", error);
+    window.alert("Could not restore this quote.");
+    return;
   }
+
+  await loadArchivedQuotes();
+
+  if (status === "Approved") {
+    window.location.href = "/current-jobs";
+    return;
+  }
+
+  window.location.href = "/quotes";
+}
 
   function deleteArchivedQuote(quoteToDelete: QuoteItem) {
     const confirmed = window.confirm(
