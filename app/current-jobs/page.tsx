@@ -183,7 +183,7 @@ export default function CurrentJobsPage() {
       completed_at: job.completedAt || now,
       archived_at: now,
       archive_reason: "Completed job",
-      payment_status: job.paymentStatus || "Unpaid",
+      
     })
     .eq("id", job.id);
 
