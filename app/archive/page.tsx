@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { supabase } from "../../lib/supabase";
 type QuoteStatus =
   | "Draft"
   | "Sent"
@@ -85,10 +85,20 @@ export default function ArchivePage() {
     );
   }
 
-  function loadArchivedQuotes() {
-    const stored = safeParseQuotes("quotesnapArchivedQuotes");
-    setQuotes([...stored].reverse());
+async function loadArchivedQuotes() {
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("*")
+    .eq("status", "Archived")
+    .order("archived_at", { ascending: false });
+
+  if (error) {
+    console.error("Failed to load archived quotes:", error);
+    return;
   }
+
+  setQuotes(data || []);
+}
 
   function goHome() {
     window.location.href = "/";
