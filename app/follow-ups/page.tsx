@@ -96,26 +96,7 @@ function formatDateTime(date: string) {
     return;
   }
 
-  if (currentFollowUp.followup_number === 1) {
-    const nextDueDate = new Date();
-    nextDueDate.setDate(nextDueDate.getDate() + 7);
-
-    const { error: insertError } = await supabase
-      .from("quote_followups")
-      .insert({
-        quote_id: currentFollowUp.quote_id,
-        workspace_id: currentFollowUp.workspace_id,
-        followup_number: 2,
-        due_at: nextDueDate.toISOString(),
-        status: "Pending",
-      });
-
-    if (insertError) {
-      console.error("Failed to create follow-up #2:", insertError);
-      alert("Follow-up #1 was marked sent, but follow-up #2 could not be scheduled.");
-      await loadFollowUps();
-      return;
-    }
+  
   }
 
   await loadFollowUps();
