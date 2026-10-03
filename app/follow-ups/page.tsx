@@ -97,7 +97,7 @@ function formatDateTime(date: string) {
   }
 
   
-  }
+  
 
   await loadFollowUps();
 }
