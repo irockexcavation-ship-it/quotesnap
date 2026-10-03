@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { supabase } from "../../lib/supabase";
 type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
 type PaymentStatus = "Unpaid" | "Paid";
 
@@ -57,18 +57,41 @@ export default function CurrentJobsPage() {
     );
   }
 
-  function loadJobs() {
-    const savedQuotes = safeRead(SAVED_KEY);
+  async function loadJobs() {
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("*")
+    .eq("status", "Approved")
+    .order("approved_at", { ascending: false });
 
-    const approvedJobs = savedQuotes
-      .filter((quote) => quote.status === "Approved")
-      .map((quote) => ({
-        ...quote,
-        paymentStatus: quote.paymentStatus || "Unpaid",
-      }));
-
-    setJobs(approvedJobs);
+  if (error) {
+    console.error("Failed to load current jobs:", error);
+    setJobs([]);
+    return;
   }
+
+  const approvedJobs: QuoteItem[] = (data || []).map((quote) => ({
+    id: quote.id,
+    quoteNumber: quote.quote_number || "",
+    clientName: quote.client_name || "",
+    projectAddress: quote.project_address || "",
+    contactInfo: quote.contact_info || "",
+    quoteDate: quote.quote_date || "",
+    projectTotal: quote.project_total || "",
+    startWindow: quote.start_window || "",
+    scopeOfWork: quote.scope_of_work || "",
+    bannerImage: quote.banner_image || "",
+    status: "Approved",
+    paymentStatus: quote.payment_status || "Unpaid",
+    approvedAt: quote.approved_at || undefined,
+    completedAt: quote.completed_at || undefined,
+    sentAt: quote.sent_at || undefined,
+    archivedAt: quote.archived_at || undefined,
+    archiveReason: quote.archive_reason || undefined,
+  }));
+
+  setJobs(approvedJobs);
+}
 
   function goHome() {
     window.location.href = "/";
