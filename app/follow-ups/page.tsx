@@ -62,7 +62,35 @@ export default function FollowUpsPage() {
       year: "numeric",
     });
   }
+function formatDateTime(date: string) {
+  return new Date(date).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
+  async function markFollowUpSent(id: string) {
+  const { error } = await supabase
+    .from("quote_followups")
+    .update({
+      status: "Sent",
+      sent_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Failed to mark follow-up sent:", error);
+    alert("Could not mark follow-up as sent.");
+    return;
+  }
+
+  setFollowUps((current) =>
+    current.filter((followUp) => followUp.id !== id)
+  );
+}
   return (
     <main
       style={{
@@ -169,8 +197,23 @@ export default function FollowUpsPage() {
               </div>
 
               <div style={{ marginTop: "5px" }}>
-                Due: {formatDate(followUp.due_at)}
+                Due: {formatDateTime(followUp.due_at)}
               </div>
+              <button
+  onClick={() => markFollowUpSent(followUp.id)}
+  style={{
+    marginTop: "16px",
+    background: "#111",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    padding: "10px 16px",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Mark Follow-Up Sent
+</button>
             </div>
           ))}
       </div>
