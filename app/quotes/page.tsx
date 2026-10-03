@@ -223,53 +223,51 @@ export default function QuotesPage() {
     saveActiveQuotes(updated);
   }
 
-  function updateStatus(quoteToUpdate: QuoteItem, status: QuoteStatus) {
-    const active = safeParseQuotes("quotesnapSavedQuotes");
-    const cleanedActive = dedupeQuotes(active);
+  async function updateStatus(
+  quoteToUpdate: QuoteItem,
+  status: QuoteStatus
+) {
+  const now = new Date().toISOString();
 
-    if (status === "Archived") {
-      const archived = safeParseQuotes("quotesnapArchivedQuotes");
+  const updates: Record<string, string | null> = {
+    status,
+  };
 
-      const updatedActive = cleanedActive.filter(
-        (q: QuoteItem) => q.id !== quoteToUpdate.id
-      );
-
-      const cleanedArchived = archived.filter(
-        (q: QuoteItem) => q.id !== quoteToUpdate.id
-      );
-
-      cleanedArchived.unshift({
-        ...quoteToUpdate,
-        status: "Archived",
-        archivedAt: new Date().toISOString(),
-        archiveReason: "Manually archived",
-      });
-
-      localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updatedActive));
-      localStorage.setItem(
-        "quotesnapArchivedQuotes",
-        JSON.stringify(dedupeQuotes(cleanedArchived))
-      );
-
-      setQuotes([...updatedActive].reverse());
-      return;
-    }
-
-    const updatedActive = cleanedActive.map((q) => {
-      if (q.id !== quoteToUpdate.id) return q;
-
-      return {
-        ...q,
-        status,
-        archivedAt: undefined,
-        sentAt: status === "Sent" ? q.sentAt || new Date().toISOString() : q.sentAt,
-        approvedAt: status === "Approved" ? new Date().toISOString() : q.approvedAt,
-      };
-    });
-
-    localStorage.setItem("quotesnapSavedQuotes", JSON.stringify(updatedActive));
-    setQuotes([...updatedActive].reverse());
+  if (status === "Sent") {
+    updates.sent_at = quoteToUpdate.sentAt || now;
+    updates.archived_at = null;
+    updates.archive_reason = null;
   }
+
+  if (status === "Approved") {
+    updates.approved_at = quoteToUpdate.approvedAt || now;
+    updates.archived_at = null;
+    updates.archive_reason = null;
+  }
+
+  if (status === "Draft") {
+    updates.archived_at = null;
+    updates.archive_reason = null;
+  }
+
+  if (status === "Archived") {
+    updates.archived_at = now;
+    updates.archive_reason = "Manually archived";
+  }
+
+  const { error } = await supabase
+    .from("quotes")
+    .update(updates)
+    .eq("id", quoteToUpdate.id);
+
+  if (error) {
+    console.error("Failed to update quote status:", error);
+    alert("Quote status could not be updated.");
+    return;
+  }
+
+  await loadQuotes();
+}
 
   function statusColor(status: QuoteItem["status"]) {
     if (status === "Approved") {
