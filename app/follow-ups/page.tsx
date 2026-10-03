@@ -72,8 +72,15 @@ function formatDateTime(date: string) {
   });
 }
 
-  async function markFollowUpSent(id: string) {
-  const { error } = await supabase
+ async function markFollowUpSent(id: string) {
+  const currentFollowUp = followUps.find((followUp) => followUp.id === id);
+
+  if (!currentFollowUp) {
+    alert("Could not find this follow-up.");
+    return;
+  }
+
+  const { error: updateError } = await supabase
     .from("quote_followups")
     .update({
       status: "Sent",
@@ -81,15 +88,34 @@ function formatDateTime(date: string) {
     })
     .eq("id", id);
 
-  if (error) {
-    console.error("Failed to mark follow-up sent:", error);
+  if (updateError) {
+    console.error("Failed to mark follow-up sent:", updateError);
     alert("Could not mark follow-up as sent.");
     return;
   }
 
-  setFollowUps((current) =>
-    current.filter((followUp) => followUp.id !== id)
-  );
+  if (currentFollowUp.followup_number === 1) {
+    const nextDueDate = new Date();
+    nextDueDate.setDate(nextDueDate.getDate() + 7);
+
+    const { error: insertError } = await supabase
+      .from("quote_followups")
+      .insert({
+        quote_id: currentFollowUp.quote_id,
+        followup_number: 2,
+        due_at: nextDueDate.toISOString(),
+        status: "Pending",
+      });
+
+    if (insertError) {
+      console.error("Failed to create follow-up #2:", insertError);
+      alert("Follow-up #1 was marked sent, but follow-up #2 could not be scheduled.");
+      await loadFollowUps();
+      return;
+    }
+  }
+
+  await loadFollowUps();
 }
   return (
     <main
