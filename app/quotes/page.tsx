@@ -279,7 +279,7 @@ export default function QuotesPage() {
     return { bg: "#fff7ed", text: "#9a3412", border: "#fdba74" };
   }
 
-  const visibleQuotes = quotes.filter((q) => (q.status || "Draft") !== "Approved");
+  const visibleQuotes = quotes.filter((q) => !["Approved", "Archived"].includes(q.status || "Draft"));
 
   const filtered = visibleQuotes.filter((q) =>
     `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
