@@ -97,7 +97,22 @@ async function loadArchivedQuotes() {
     return;
   }
 
-  setQuotes(data || []);
+  setQuotes(
+  (data || []).map((q) => ({
+    ...q,
+    clientName: q.client_name,
+    quoteNumber: q.quote_number,
+    projectAddress: q.project_address,
+    contactInfo: q.contact_info,
+    quoteDate: q.quote_date,
+    projectTotal: q.project_total,
+    bannerImage: q.banner_image_url,
+    paymentStatus: q.payment_status,
+    archivedAt: q.archived_at,
+    completedAt: q.completed_at,
+    archiveReason: q.archive_reason,
+  }))
+);
 }
 
   function goHome() {
