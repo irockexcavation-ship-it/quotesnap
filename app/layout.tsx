@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
+import AuthGuard from "./AuthGuard";
 export const metadata: Metadata = {
   title: "QuoteSnap",
   description: "Fast field quotes for contractors",
@@ -52,7 +52,7 @@ export default function RootLayout({
           </div>
         </div>
 
-        {children}
+     <AuthGuard>{children}</AuthGuard>
       </body>
     </html>
   );
