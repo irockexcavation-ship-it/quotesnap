@@ -165,46 +165,36 @@ export default function CurrentJobsPage() {
     loadJobs();
   }
 
-  function completeJob(job: QuoteItem) {
-    const confirmed = window.confirm(
-      `Mark job completed and move to archive for ${
-        job.clientName || "this client"
-      }?`
-    );
+  async function completeJob(job: QuoteItem) {
+  const confirmed = window.confirm(
+    `Mark job completed and move to archive for ${
+      job.clientName || "this client"
+    }?`
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    const savedQuotes = safeRead(SAVED_KEY);
-    const oldActiveQuotes = safeRead(OLD_ACTIVE_KEY);
-    const archivedQuotes = safeRead(ARCHIVE_KEY);
+  const now = new Date().toISOString();
 
-    const remainingSaved = savedQuotes.filter((quote) => !sameQuote(quote, job));
-    const remainingOldActive = oldActiveQuotes.filter(
-      (quote) => !sameQuote(quote, job)
-    );
-
-    const alreadyArchived = archivedQuotes.some((quote) =>
-      sameQuote(quote, job)
-    );
-
-    const completedJob: QuoteItem = {
-      ...job,
+  const { error } = await supabase
+    .from("quotes")
+    .update({
       status: "Archived",
-      paymentStatus: job.paymentStatus || "Unpaid",
-      completedAt: job.completedAt || new Date().toISOString(),
-      archivedAt: new Date().toISOString(),
-      archiveReason: "Completed job",
-    };
+      completed_at: job.completedAt || now,
+      archived_at: now,
+      archive_reason: "Completed job",
+      payment_status: job.paymentStatus || "Unpaid",
+    })
+    .eq("id", job.id);
 
-    safeWrite(SAVED_KEY, remainingSaved);
-    safeWrite(OLD_ACTIVE_KEY, remainingOldActive);
-
-    if (!alreadyArchived) {
-      safeWrite(ARCHIVE_KEY, [completedJob, ...archivedQuotes]);
-    }
-
-    loadJobs();
+  if (error) {
+    console.error("Failed to complete job:", error);
+    alert("Job could not be completed.");
+    return;
   }
+
+  await loadJobs();
+}
 
   return (
     <main
