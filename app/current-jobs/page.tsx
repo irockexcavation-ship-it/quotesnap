@@ -133,37 +133,37 @@ export default function CurrentJobsPage() {
     loadJobs();
   }
 
-  function markPaid(job: QuoteItem) {
-    const savedQuotes = safeRead(SAVED_KEY);
+  async function markPaid(job: QuoteItem) {
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      payment_status: "Paid",
+    })
+    .eq("id", job.id);
 
-    const updatedSaved = savedQuotes.map((quote) => {
-      if (!sameQuote(quote, job)) return quote;
-
-      return {
-        ...quote,
-        paymentStatus: "Paid" as PaymentStatus,
-      };
-    });
-
-    safeWrite(SAVED_KEY, updatedSaved);
-    loadJobs();
+  if (error) {
+    console.error("Failed to mark job paid:", error);
+    return;
   }
 
-  function markUnpaid(job: QuoteItem) {
-    const savedQuotes = safeRead(SAVED_KEY);
+  await loadJobs();
+}
 
-    const updatedSaved = savedQuotes.map((quote) => {
-      if (!sameQuote(quote, job)) return quote;
+  async function markUnpaid(job: QuoteItem) {
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      payment_status: "Unpaid",
+    })
+    .eq("id", job.id);
 
-      return {
-        ...quote,
-        paymentStatus: "Unpaid" as PaymentStatus,
-      };
-    });
-
-    safeWrite(SAVED_KEY, updatedSaved);
-    loadJobs();
+  if (error) {
+    console.error("Failed to mark job unpaid:", error);
+    return;
   }
+
+  await loadJobs();
+}
 
   async function completeJob(job: QuoteItem) {
   const confirmed = window.confirm(
