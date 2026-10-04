@@ -1,6 +1,63 @@
 "use client";
-
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
 export default function DashboardPage() {
+    const [openQuotes, setOpenQuotes] = useState(0);
+  const [acceptedJobs, setAcceptedJobs] = useState(0);
+  const [followUps, setFollowUps] = useState(0);
+  const [acceptedValue, setAcceptedValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  async function loadDashboard() {
+    setLoading(true);
+
+    try {
+      const { data: quotes, error: quotesError } = await supabase
+        .from("quotes")
+        .select("*");
+
+      if (quotesError) {
+        console.error("Dashboard quote load failed:", quotesError);
+      } else if (quotes) {
+        const open = quotes.filter(
+          (quote) => quote.status === "Sent" || quote.status === "Draft"
+        );
+
+        const accepted = quotes.filter(
+          (quote) => quote.status === "Approved"
+        );
+
+        setOpenQuotes(open.length);
+        setAcceptedJobs(accepted.length);
+
+        const total = accepted.reduce((sum, quote) => {
+          const amount = Number(quote.project_total || 0);
+          return sum + amount;
+        }, 0);
+
+        setAcceptedValue(total);
+      }
+
+      const { data: followUpData, error: followUpError } = await supabase
+        .from("quote_followups")
+        .select("id")
+        .eq("status", "Pending");
+
+      if (followUpError) {
+        console.error("Dashboard follow-up load failed:", followUpError);
+      } else {
+        setFollowUps(followUpData?.length || 0);
+      }
+    } catch (error) {
+      console.error("Dashboard load failed:", error);
+    }
+
+    setLoading(false);
+  }
   const goTo = (path: string) => {
     window.location.href = path;
   };
@@ -106,7 +163,7 @@ export default function DashboardPage() {
         >
           <div onClick={() => goTo("/quotes")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>📄</div>
-            <div style={{ fontSize: "32px", fontWeight: 900 }}>0</div>
+            <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : openQuotes}</div>
             <div style={{ color: "#999", fontSize: "12px" }}>
               OPEN QUOTES
             </div>
@@ -114,7 +171,7 @@ export default function DashboardPage() {
 
           <div onClick={() => goTo("/current-jobs")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>✓</div>
-            <div style={{ fontSize: "32px", fontWeight: 900 }}>0</div>
+            <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : acceptedJobs}</div>
             <div style={{ color: "#999", fontSize: "12px" }}>
               ACCEPTED JOBS
             </div>
@@ -122,7 +179,7 @@ export default function DashboardPage() {
 
           <div onClick={() => goTo("/follow-ups")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>⏱</div>
-            <div style={{ fontSize: "32px", fontWeight: 900 }}>0</div>
+            <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : followUps}</div>
             <div style={{ color: "#999", fontSize: "12px" }}>
               FOLLOW-UPS
             </div>
@@ -130,7 +187,9 @@ export default function DashboardPage() {
 
           <div onClick={() => goTo("/current-jobs")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>💰</div>
-            <div style={{ fontSize: "28px", fontWeight: 900 }}>$0</div>
+           <div style={{ fontSize: "28px", fontWeight: 900 }}>
+  {loading ? "..." : `$${acceptedValue.toLocaleString()}`}
+</div>
             <div style={{ color: "#999", fontSize: "12px" }}>
               ACCEPTED VALUE
             </div>
