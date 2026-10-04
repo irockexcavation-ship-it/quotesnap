@@ -678,9 +678,9 @@ function buildPhotoFileName() {
   : "";
 
     const message =
-      `Hi ${client}, here is your quote${quoteNum} for the project we discussed. ` +
-      `If you have any questions or want to move forward, let me know. ` +
-      `- Kenny, iRock Excavation`;
+  "Hi " + client + ", here is your quote" + quoteNum + " for the project we discussed. " +
+  "If you have any questions or want to move forward, let me know. " +
+  "- Kenny, iRock Excavation";
 
     window.location.href = `sms:?&body=${encodeURIComponent(
       message
