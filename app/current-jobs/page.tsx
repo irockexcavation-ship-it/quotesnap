@@ -63,7 +63,8 @@ export default function CurrentJobsPage() {
     .from("quotes")
     .select("*")
     .eq("status", "Approved")
-    .order("approved_at", { ascending: false });
+.order("scheduled_date", { ascending: true, nullsFirst: false })
+.order("approved_at", { ascending: false });
 
   if (error) {
     console.error("Failed to load current jobs:", error);
