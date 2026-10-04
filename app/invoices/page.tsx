@@ -123,12 +123,16 @@ export default function InvoicesPage() {
                 Number(invoice.amount_paid || 0);
 
               return (
-                <div
-                  key={invoice.id}
-                  style={{
+               <div
+  key={invoice.id}
+  onClick={() => {
+    window.location.href = `/invoices?id=${invoice.id}`;
+  }}
+  style={{
                     border: "1px solid #ddd",
                     borderRadius: "14px",
                     padding: "18px",
+    cursor: "pointer",
                   }}
                 >
                   <div
