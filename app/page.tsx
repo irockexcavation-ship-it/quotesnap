@@ -1,120 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
-
-type QuoteStatus = "Draft" | "Sent" | "Approved" | "Archived";
-
-type QuoteItem = {
-  id?: string;
-  quoteNumber?: string;
-  clientName?: string;
-  projectAddress?: string;
-  contactInfo?: string;
-  quoteDate?: string;
-  projectTotal?: string;
-  startWindow?: string;
-  scopeOfWork?: string;
-  bannerImage?: string;
-  status?: QuoteStatus;
-  paymentStatus?: "Paid" | "Unpaid";
-  approvedAt?: string;
-};
-
-const SAVED_KEY = "quotesnapSavedQuotes";
-
-const OLD_JOB_KEYS = [
-  "quotesnapActiveQuotes",
-  "quotesnapCurrentJobs",
-  "quotesnapApprovedQuotes",
-];
 export default function HomePage() {
-useEffect(() => {
-  try {
-    recoverOldCurrentJobs();
-  } catch (error) {
-    console.error("QuoteSnap recovery skipped because storage data was bad:", error);
-    localStorage.setItem("quotesnapRecoveryError", "true");
-  }
-}, []);
+  const goTo = (path: string) => {
+    window.location.href = path;
+  };
 
-  function safelyReadArray(key: string): QuoteItem[] {
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed = JSON.parse(raw || "[]");
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function recoverOldCurrentJobs() {
-    const savedQuotes = safelyReadArray(SAVED_KEY);
-
-    const existingIds = new Set(
-      savedQuotes.map((q) => q.id || q.quoteNumber).filter(Boolean)
-    );
-
-    let recoveredJobs: QuoteItem[] = [];
-
-    for (const key of OLD_JOB_KEYS) {
-      const oldJobs = safelyReadArray(key);
-
-      const cleanedJobs = oldJobs
-        .filter((job) => {
-          const identifier = job.id || job.quoteNumber;
-          return identifier && !existingIds.has(identifier);
-        })
-        .map((job) => {
-          const fixedJob = {
-            ...job,
-            id: job.id || `${job.quoteNumber || "recovered"}-${Date.now()}`,
-            status: "Approved" as QuoteStatus,
-            paymentStatus: job.paymentStatus || "Unpaid",
-            approvedAt: job.approvedAt || new Date().toISOString(),
-          };
-
-          existingIds.add(fixedJob.id || fixedJob.quoteNumber || "");
-
-          return fixedJob;
-        });
-
-      recoveredJobs = [...recoveredJobs, ...cleanedJobs];
-    }
-
-    if (recoveredJobs.length === 0) return;
-
-    localStorage.setItem(
-      SAVED_KEY,
-      JSON.stringify([...recoveredJobs, ...savedQuotes])
-    );
-
-    localStorage.setItem("quotesnapRecoveryComplete", "true");
-  }
-
-  function startNewQuote() {
-    localStorage.removeItem("quotesnapEditDraft");
-    localStorage.removeItem("quotesnapDraft");
-    window.location.href = "/new-quote";
-  }
-
-  function openQuotes() {
-    window.location.href = "/quotes";
-  }
-
-  function openTemplates() {
-    window.location.href = "/templates";
-  }
-
-  function openCurrentJobs() {
-    window.location.href = "/current-jobs";
-  }
-
-  function openArchive() {
-    window.location.href = "/archive";
-  }
-function openFollowUps() {
-  window.location.href = "/follow-ups";
-}
   return (
     <main
       style={{
@@ -141,116 +31,85 @@ function openFollowUps() {
       >
         <img
           src="/icon.png"
-          alt="QuoteSnap icon"
+          alt="QuoteSnap"
           style={{
             width: "104px",
             height: "104px",
-            marginBottom: "18px",
             display: "block",
-            marginLeft: "auto",
-            marginRight: "auto",
-            filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.14))",
+            margin: "0 auto 18px",
           }}
         />
 
         <h1
           style={{
+            margin: 0,
             fontSize: "34px",
-            margin: "0 0 8px 0",
-            color: "#1c1917",
-            letterSpacing: "-0.02em",
+            fontWeight: 800,
+            color: "#111111",
           }}
         >
           QuoteSnap
         </h1>
 
-        <div
+        <p
           style={{
-            fontSize: "16px",
-            fontWeight: 700,
-            color: "#9a3412",
-            marginBottom: "6px",
+            margin: "8px 0 30px",
+            color: "#666666",
+            fontSize: "15px",
           }}
         >
-          Fast Field Quotes for Contractors
-        </div>
+          Fast quotes. Rock-solid workflow.
+        </p>
 
-        <div
+        <button
+          onClick={() => goTo("/new-quote")}
+          style={buttonStyle}
+        >
+          ＋ NEW QUOTE
+        </button>
+
+        <button
+          onClick={() => goTo("/quotes")}
+          style={buttonStyle}
+        >
+          ▤ QUOTES
+        </button>
+
+        <button
+          onClick={() => goTo("/dashboard")}
           style={{
-            fontSize: "14px",
-            color: "#78716c",
-            marginBottom: "30px",
-            lineHeight: 1.5,
+            ...buttonStyle,
+            background: "#111111",
+            marginBottom: 0,
           }}
         >
-          Build polished quotes on-site with photos, templates, saved clients,
-          and PDF export.
-        </div>
-
-        <div style={{ display: "grid", gap: "14px" }}>
-          <button onClick={startNewQuote} style={primaryButton}>
-            New Quote
-          </button>
-
-          <button onClick={openQuotes} style={secondaryButton}>
-            Quotes
-          </button>
-
-          <button onClick={openCurrentJobs} style={secondaryButton}>
-            Current Jobs
-          </button>
-
-          <button onClick={openTemplates} style={secondaryButton}>
-            Templates
-          </button>
-
-          <button onClick={openArchive} style={secondaryButton}>
-            Archive
-          </button>
-        <button onClick={openFollowUps} style={secondaryButton}>
-  Follow-Ups
-</button>
-        </div>
+          ◉ DASHBOARD
+        </button>
 
         <div
           style={{
-            marginTop: "24px",
-            paddingTop: "18px",
-            borderTop: "1px solid #e7e5e4",
+            marginTop: "28px",
             fontSize: "12px",
-            color: "#a8a29e",
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
+            color: "#999999",
           }}
         >
-          Stupid Simple. Stupid Fast.
+          iRock LLC
         </div>
       </div>
     </main>
   );
 }
 
-const primaryButton = {
+const buttonStyle = {
   width: "100%",
-  padding: "16px",
-  borderRadius: "12px",
+  padding: "17px 18px",
+  marginBottom: "14px",
   border: "none",
+  borderRadius: "10px",
   background: "#f97316",
   color: "#ffffff",
   fontSize: "16px",
-  fontWeight: "bold" as const,
+  fontWeight: 800,
   cursor: "pointer",
-  boxShadow: "0 8px 18px rgba(249,115,22,0.28)",
-};
-
-const secondaryButton = {
-  width: "100%",
-  padding: "15px",
-  borderRadius: "12px",
-  border: "1px solid #d6d3d1",
-  background: "#ffffff",
-  color: "#1c1917",
-  fontSize: "16px",
-  fontWeight: "bold" as const,
-  cursor: "pointer",
+  letterSpacing: "0.4px",
 };
