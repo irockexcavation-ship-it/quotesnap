@@ -1,4 +1,3 @@
-```
 "use client";
 
 import { useEffect, useState } from "react";
@@ -1200,4 +1199,3 @@ const infoGrid = {
     "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "14px",
 };
-```
