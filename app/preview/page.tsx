@@ -682,9 +682,7 @@ function buildPhotoFileName() {
   "If you have any questions or want to move forward, let me know. " +
   "- Kenny, iRock Excavation";
 
-    window.location.href = `sms:?&body=${encodeURIComponent(
-      message
-    )}`;
+    window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
   async function createInvoice() {
     const invoiceNumber = `INV-${Date.now()}`;
