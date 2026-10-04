@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import jsPDF from "jspdf";
 
 type Invoice = {
   id: string;
@@ -90,6 +91,145 @@ export default function InvoicesPage() {
 
   function backToInvoices() {
     window.location.href = "/invoices";
+  }
+
+  function buildInvoiceFileName(invoice: Invoice) {
+    const client = (invoice.client_name || "client")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    const number = (invoice.invoice_number || "invoice")
+      .replace(/[^a-zA-Z0-9-_]+/g, "-");
+
+    return client + "_" + number + ".pdf";
+  }
+
+  function exportInvoicePDF() {
+    if (!selectedInvoice) return;
+
+    const total = Number(selectedInvoice.total || 0);
+    const paid = Number(selectedInvoice.amount_paid || 0);
+    const balance = Math.max(total - paid, 0);
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    let y = 20;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(22);
+    pdf.text("iRock Excavation & Hauling", 18, y);
+
+    y += 8;
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text("Rock Solid Driveway Systems", 18, y);
+
+    y += 6;
+    pdf.text("(502) 552-9462", 18, y);
+    y += 6;
+    pdf.text("irockexcavation@gmail.com", 18, y);
+    y += 6;
+    pdf.text("iRockX.com", 18, y);
+
+    y += 14;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text("INVOICE", 18, y);
+
+    y += 10;
+    pdf.setFontSize(11);
+    pdf.text("Invoice #:", 18, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(selectedInvoice.invoice_number || "-", 48, y);
+
+    y += 7;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Invoice Date:", 18, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(selectedInvoice.invoice_date || "-", 48, y);
+
+    if (selectedInvoice.due_date) {
+      y += 7;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Due Date:", 18, y);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(selectedInvoice.due_date, 48, y);
+    }
+
+    y += 12;
+    pdf.setDrawColor(210);
+    pdf.line(18, y, 192, y);
+
+    y += 10;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Bill To", 18, y);
+
+    y += 7;
+    pdf.setFont("helvetica", "normal");
+    pdf.text(selectedInvoice.client_name || "Unnamed Client", 18, y);
+
+    if (selectedInvoice.project_address) {
+      y += 7;
+      const addressLines = pdf.splitTextToSize(
+        selectedInvoice.project_address,
+        174
+      );
+      pdf.text(addressLines, 18, y);
+      y += (addressLines.length - 1) * 6;
+    }
+
+    y += 14;
+    pdf.setDrawColor(210);
+    pdf.line(18, y, 192, y);
+
+    y += 12;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Total", 18, y);
+    pdf.text(money(total), 192, y, { align: "right" });
+
+    y += 9;
+    pdf.text("Paid", 18, y);
+    pdf.text(money(paid), 192, y, { align: "right" });
+
+    y += 9;
+    pdf.setFontSize(14);
+    pdf.text("Balance Due", 18, y);
+    pdf.text(money(balance), 192, y, { align: "right" });
+
+    y += 14;
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Status: " + (selectedInvoice.status || "Draft"), 18, y);
+
+    y += 16;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Thank you for choosing iRock Excavation & Hauling.", 18, y);
+
+    pdf.save(buildInvoiceFileName(selectedInvoice));
+  }
+
+  function sendInvoiceText() {
+    if (!selectedInvoice) return;
+
+    const total = Number(selectedInvoice.total || 0);
+    const paid = Number(selectedInvoice.amount_paid || 0);
+    const balance = Math.max(total - paid, 0);
+    const client = selectedInvoice.client_name || "there";
+    const invoiceNumber = selectedInvoice.invoice_number || "your invoice";
+
+    const message =
+      "Hi " + client + ", here is " + invoiceNumber +
+      " from iRock Excavation & Hauling. Balance due: " +
+      money(balance) +
+      ". I am sending the invoice PDF with this message. Thank you! - Kenny";
+
+    window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
 
   async function recordPayment() {
@@ -222,6 +362,12 @@ export default function InvoicesPage() {
             </div>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button onClick={exportInvoicePDF} style={greenButton}>
+                Export Invoice PDF
+              </button>
+              <button onClick={sendInvoiceText} style={greenButton}>
+                Send Invoice Text
+              </button>
               <button onClick={backToInvoices} style={blackButton}>
                 Back to Invoices
               </button>
