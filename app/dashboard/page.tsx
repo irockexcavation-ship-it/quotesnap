@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 export default function DashboardPage() {
     const [openQuotes, setOpenQuotes] = useState(0);
   const [acceptedJobs, setAcceptedJobs] = useState(0);
+    const [currentJobs, setCurrentJobs] = useState<any[]>([]);
   const [followUps, setFollowUps] = useState(0);
     const [dueFollowUps, setDueFollowUps] = useState<any[]>([]);
   const [acceptedValue, setAcceptedValue] = useState(0);
@@ -34,7 +35,7 @@ export default function DashboardPage() {
 
         setOpenQuotes(open.length);
         setAcceptedJobs(accepted.length);
-
+setCurrentJobs(accepted);
         const total = accepted.reduce((sum, quote) => {
           const amount = Number(quote.project_total || 0);
           return sum + amount;
@@ -282,6 +283,111 @@ export default function DashboardPage() {
           }}
         >
           Due: {new Date(followUp.due_at).toLocaleString()}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+          {/* CURRENT JOBS */}
+{currentJobs.length > 0 && (
+  <div
+    style={{
+      background: "#151515",
+      border: "1px solid #333",
+      borderRadius: "18px",
+      padding: "22px",
+      marginBottom: "20px",
+    }}
+  >
+    <div
+      style={{
+        fontSize: "13px",
+        color: "#f97316",
+        fontWeight: 800,
+        letterSpacing: "1px",
+        marginBottom: "16px",
+      }}
+    >
+      CURRENT JOBS
+    </div>
+
+    {currentJobs.map((job: any) => (
+      <div
+        key={job.id}
+        onClick={() => goTo("/current-jobs")}
+        style={{
+          background: "#202020",
+          border: "1px solid #333",
+          borderRadius: "14px",
+          padding: "16px",
+          marginBottom: "10px",
+          cursor: "pointer",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "16px",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 800,
+                marginBottom: "5px",
+              }}
+            >
+              {job.client_name || "Customer"}
+            </div>
+
+            <div
+              style={{
+                color: "#aaa",
+                fontSize: "13px",
+                marginBottom: "4px",
+              }}
+            >
+              {job.quote_number || ""}
+            </div>
+
+            <div
+              style={{
+                color: "#aaa",
+                fontSize: "13px",
+              }}
+            >
+              {job.project_address || ""}
+            </div>
+          </div>
+
+          <div
+            style={{
+              textAlign: "right",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: 900,
+                marginBottom: "5px",
+              }}
+            >
+              ${Number(job.project_total || 0).toLocaleString()}
+            </div>
+
+            <div
+              style={{
+                color: job.payment_status === "Paid" ? "#22c55e" : "#f97316",
+                fontSize: "12px",
+                fontWeight: 800,
+              }}
+            >
+              {job.payment_status || "Unpaid"}
+            </div>
+          </div>
         </div>
       </div>
     ))}
