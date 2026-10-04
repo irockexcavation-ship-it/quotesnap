@@ -101,6 +101,16 @@ function formatDateTime(date: string) {
 
   await loadFollowUps();
 }
+  function sendFollowUpText(followUp: FollowUp) {
+  const client = followUp.quotes?.client_name || "there";
+
+  const message =
+    `Hi ${client}, just following up on the quote I sent over. ` +
+    `I wanted to see if you had any questions or if you'd like to move forward with the project. ` +
+    `- Kenny, iRock Excavation`;
+
+  window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
+}
   return (
     <main
       style={{
@@ -209,6 +219,22 @@ function formatDateTime(date: string) {
               <div style={{ marginTop: "5px" }}>
                 Due: {formatDateTime(followUp.due_at)}
               </div>
+             <button
+  onClick={() => sendFollowUpText(followUp)}
+  style={{
+    marginTop: "16px",
+    marginRight: "10px",
+    background: "#15803d",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    padding: "10px 16px",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Send Follow-Up Text
+</button>
               <button
   onClick={() => markFollowUpSent(followUp.id)}
   style={{
