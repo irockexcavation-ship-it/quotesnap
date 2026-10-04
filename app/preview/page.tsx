@@ -685,7 +685,37 @@ export default function PreviewPage() {
       message
     )}`;
   }
+async function createInvoice() {
+  const invoiceNumber = `INV-${Date.now()}`;
 
+  const { data, error } = await supabase
+    .from("invoices")
+    .insert({
+      workspace_id: quote.workspace_id,
+      quote_id: quote.id,
+      invoice_number: invoiceNumber,
+      client_name: quote.clientName || "",
+      project_address: quote.projectAddress || "",
+      contact_info: quote.contactInfo || "",
+      scope_of_work: quote.scope || "",
+      subtotal: quote.total || 0,
+      adjustments: 0,
+      total: quote.total || 0,
+      amount_paid: 0,
+      status: "Draft",
+      invoice_date: new Date().toISOString().split("T")[0],
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to create invoice:", error);
+    alert("Could not create invoice.");
+    return;
+  }
+
+  window.location.href = `/invoices?id=${data.id}`;
+}
   function goHome() {
     window.location.href = "/";
   }
@@ -761,7 +791,20 @@ export default function PreviewPage() {
         >
           Send Quote Text
         </button>
-
+<button
+  onClick={createInvoice}
+  style={{
+    padding: "12px 16px",
+    background: "#15803d",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  Create Invoice
+</button>
         <button
           onClick={handleEdit}
           style={topButton(
