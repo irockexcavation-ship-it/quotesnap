@@ -689,11 +689,23 @@ export default function PreviewPage() {
 async function createInvoice() {
   const invoiceNumber = `INV-${Date.now()}`;
 
+  const { data: savedQuote, error: quoteError } = await supabase
+    .from("quotes")
+    .select("id, workspace_id")
+    .eq("quote_number", quote.quoteNumber)
+    .single();
+
+  if (quoteError || !savedQuote) {
+    console.error("Could not find saved quote:", quoteError);
+    alert("Could not find the saved quote.");
+    return;
+  }
+
   const { data, error } = await supabase
     .from("invoices")
     .insert({
-      workspace_id: quote.workspace_id,
-      quote_id: quote.id,
+      workspace_id: savedQuote.workspace_id,
+      quote_id: savedQuote.id,
       invoice_number: invoiceNumber,
       client_name: quote.clientName || "",
       project_address: quote.projectAddress || "",
@@ -714,6 +726,9 @@ async function createInvoice() {
     alert("Could not create invoice.");
     return;
   }
+
+  window.location.href = `/invoices?id=${data.id}`;
+}
 
   window.location.href = `/invoices?id=${data.id}`;
 }
