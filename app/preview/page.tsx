@@ -673,10 +673,9 @@ function buildPhotoFileName() {
     const client =
       quote.clientName || "there";
 
-    const quoteNum =
-      quote.quoteNumber
-        ? ` (${quote.quoteNumber})`
-        : "";
+    const quoteNum = quote.quoteNumber
+  ? "(" + quote.quoteNumber + ")"
+  : "";
 
     const message =
       `Hi ${client}, here is your quote${quoteNum} for the project we discussed. ` +
