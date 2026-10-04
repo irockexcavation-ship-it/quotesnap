@@ -16,13 +16,14 @@ type QuoteItem = {
   startWindow?: string;
   scopeOfWork?: string;
   bannerImage?: string;
-  status?: QuoteStatus;
-  paymentStatus?: PaymentStatus;
-  approvedAt?: string;
-  completedAt?: string;
-  sentAt?: string;
-  archivedAt?: string;
-  archiveReason?: string;
+ status?: QuoteStatus;
+paymentStatus?: PaymentStatus;
+approvedAt?: string;
+scheduledDate?: string;
+completedAt?: string;
+sentAt?: string;
+archivedAt?: string;
+archiveReason?: string;
 };
 
 const SAVED_KEY = "quotesnapSavedQuotes";
@@ -84,6 +85,7 @@ export default function CurrentJobsPage() {
     status: "Approved",
     paymentStatus: quote.payment_status || "Unpaid",
     approvedAt: quote.approved_at || undefined,
+scheduledDate: quote.scheduled_date || undefined,
     completedAt: quote.completed_at || undefined,
     sentAt: quote.sent_at || undefined,
     archivedAt: quote.archived_at || undefined,
@@ -148,7 +150,32 @@ export default function CurrentJobsPage() {
 
   await loadJobs();
 }
+async function scheduleJob(job: QuoteItem) {
+  const currentDate = job.scheduledDate || "";
+  const scheduledDate = window.prompt(
+    "Enter scheduled date (YYYY-MM-DD):",
+    currentDate
+  );
 
+  if (scheduledDate === null) return;
+
+  const trimmedDate = scheduledDate.trim();
+
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      scheduled_date: trimmedDate || null,
+    })
+    .eq("id", job.id);
+
+  if (error) {
+    console.error("Failed to schedule job:", error);
+    alert("Could not save scheduled date.");
+    return;
+  }
+
+  await loadJobs();
+}
   async function markUnpaid(job: QuoteItem) {
   const { error } = await supabase
     .from("quotes")
@@ -327,7 +354,18 @@ export default function CurrentJobsPage() {
                         }}
                       >
                         {job.projectAddress || ""}
-                      </div>
+                      </div>{job.scheduledDate && (
+  <div
+    style={{
+      fontSize: "13px",
+      color: "#f97316",
+      fontWeight: 700,
+      marginTop: "6px",
+    }}
+  >
+    Scheduled: {job.scheduledDate}
+  </div>
+)}
                     </div>
 
                     <div
@@ -385,7 +423,13 @@ export default function CurrentJobsPage() {
                         Mark Paid
                       </button>
                     )}
-
+<button
+  type="button"
+  onClick={() => scheduleJob(job)}
+  style={smallButton("#f97316", "#ffffff")}
+>
+  Schedule Job
+</button>
                     <button
                       type="button"
                       onClick={() => completeJob(job)}
