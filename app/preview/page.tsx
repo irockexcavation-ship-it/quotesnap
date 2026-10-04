@@ -37,28 +37,28 @@ export default function PreviewPage() {
       .replace(/^-+|-+$/g, "");
   }
 
-  function buildBaseName() {
-    const quoteNum =
-      quote.quoteNumber || "IR-no-number";
+function buildBaseName() {
+  const quoteNum =
+    quote.quoteNumber || "IR-no-number";
 
-    const client = quote.clientName
-      ? slugify(quote.clientName)
-      : "client";
+  const client = quote.clientName
+    ? slugify(quote.clientName)
+    : "client";
 
-    return `${client}_${quoteNum}`;
-  }
+  return client + "_" + quoteNum;
+}
 
-  function buildFileName() {
-    return `${buildBaseName()}_quote.pdf`;
-  }
+function buildFileName() {
+  return buildBaseName() + "_quote.pdf";
+}
 
-  function buildImageFileName() {
-    return `${buildBaseName()}_quote-image.png`;
-  }
+function buildImageFileName() {
+  return buildBaseName() + "_quote-image.png";
+}
 
-  function buildPhotoFileName() {
-    return `${buildBaseName()}_photo.jpg`;
-  }
+function buildPhotoFileName() {
+  return buildBaseName() + "_photo.jpg";
+}
 
   async function saveQuoteImage() {
     const element =
