@@ -113,28 +113,24 @@ scheduledDate: quote.scheduled_date || undefined,
     window.location.href = "/preview";
   }
 
-  function returnToQuotes(job: QuoteItem) {
-    const savedQuotes = safeRead(SAVED_KEY);
+ async function returnToQuotes(job: QuoteItem) {
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      status: "Sent",
+      approved_at: null,
+      scheduled_date: null,
+    })
+    .eq("id", job.id);
 
-    const updatedSaved = savedQuotes.map((quote) => {
-      if (!sameQuote(quote, job)) return quote;
-
-      return {
-        ...quote,
-        status: "Sent" as QuoteStatus,
-        approvedAt: undefined,
-        paymentStatus: quote.paymentStatus || "Unpaid",
-      };
-    });
-
-    safeWrite(SAVED_KEY, updatedSaved);
-
-    const oldActive = safeRead(OLD_ACTIVE_KEY);
-    const updatedOldActive = oldActive.filter((quote) => !sameQuote(quote, job));
-    safeWrite(OLD_ACTIVE_KEY, updatedOldActive);
-
-    loadJobs();
+  if (error) {
+    console.error("Failed to return job to quotes:", error);
+    alert("Could not return this job to Quotes.");
+    return;
   }
+
+  await loadJobs();
+}
 
   async function markPaid(job: QuoteItem) {
   const { error } = await supabase
