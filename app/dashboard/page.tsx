@@ -318,7 +318,10 @@ setCurrentJobs(accepted);
     {currentJobs.map((job: any) => (
       <div
         key={job.id}
-        onClick={() => goTo("/current-jobs")}
+        onClick={() => {
+    localStorage.setItem("quotesnapEditDraft", JSON.stringify(job));
+    window.location.href = "/preview";
+}}
         style={{
           background: "#202020",
           border: "1px solid #333",
