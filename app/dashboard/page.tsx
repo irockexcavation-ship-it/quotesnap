@@ -228,7 +228,10 @@ export default function DashboardPage() {
             <Action
               icon="＋"
               label="NEW QUOTE"
-              onClick={() => goTo("/new-quote")}
+              onClick={() => {
+  localStorage.removeItem("quotesnapEditDraft");
+  goTo("/new-quote");
+}}
             />
 
             <Action
