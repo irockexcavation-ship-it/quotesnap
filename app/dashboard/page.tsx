@@ -235,7 +235,11 @@ setCurrentJobs(accepted);
     {dueFollowUps.map((followUp: any) => (
       <div
         key={followUp.id}
-        onClick={() => goTo("/follow-ups")}
+        onClick={() => {
+    if (!followUp.quotes) return;
+    localStorage.setItem("quotesnapEditDraft", JSON.stringify(followUp.quotes));
+    window.location.href = "/preview";
+}}
         style={{
           background: "#202020",
           border: "1px solid #333",
