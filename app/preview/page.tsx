@@ -1,3 +1,4 @@
+```
 "use client";
 
 import { useEffect, useState } from "react";
@@ -686,52 +687,63 @@ export default function PreviewPage() {
       message
     )}`;
   }
-async function createInvoice() {
-  const invoiceNumber = `INV-${Date.now()}`;
+  async function createInvoice() {
+    const invoiceNumber = `INV-${Date.now()}`;
 
-  const { data: savedQuote, error: quoteError } = await supabase
-    .from("quotes")
-    .select("id, workspace_id")
-    .eq("quote_number", quote.quoteNumber)
-    .single();
+    // The preview page is driven by the local draft, so first resolve that
+    // draft back to the real Supabase quote row. This gives the invoice the
+    // UUIDs required by the invoices table and its RLS policy.
+    const { data: savedQuote, error: quoteError } = await supabase
+      .from("quotes")
+      .select("id, workspace_id")
+      .eq("quote_number", quote.quoteNumber)
+      .single();
 
-  if (quoteError || !savedQuote) {
-    console.error("Could not find saved quote:", quoteError);
-    alert("Could not find the saved quote.");
-    return;
+    if (quoteError || !savedQuote) {
+      console.error("Could not find saved quote:", quoteError);
+      alert("Could not find the saved quote in QuoteSnap.");
+      return;
+    }
+
+    // projectTotal is the field used everywhere else on this preview page.
+    // Strip currency formatting before inserting into numeric DB columns.
+    const numericTotal =
+      typeof quote.projectTotal === "number"
+        ? quote.projectTotal
+        : Number(
+            String(quote.projectTotal || "0")
+              .replace(/[$,]/g, "")
+              .trim()
+          ) || 0;
+
+    const { data, error } = await supabase
+      .from("invoices")
+      .insert({
+        workspace_id: savedQuote.workspace_id,
+        quote_id: savedQuote.id,
+        invoice_number: invoiceNumber,
+        client_name: quote.clientName || "",
+        project_address: quote.projectAddress || "",
+        contact_info: quote.contactInfo || "",
+        scope_of_work: quote.scopeOfWork || "",
+        subtotal: numericTotal,
+        adjustments: 0,
+        total: numericTotal,
+        amount_paid: 0,
+        status: "Draft",
+        invoice_date: new Date().toISOString().split("T")[0],
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to create invoice:", error);
+      alert(`Could not create invoice: ${error.message}`);
+      return;
+    }
+
+    window.location.href = `/invoices?id=${data.id}`;
   }
-
-  const { data, error } = await supabase
-    .from("invoices")
-    .insert({
-      workspace_id: savedQuote.workspace_id,
-      quote_id: savedQuote.id,
-      invoice_number: invoiceNumber,
-      client_name: quote.clientName || "",
-      project_address: quote.projectAddress || "",
-      contact_info: quote.contactInfo || "",
-      scope_of_work: quote.scope || "",
-      subtotal: quote.total || 0,
-      adjustments: 0,
-      total: quote.total || 0,
-      amount_paid: 0,
-      status: "Draft",
-      invoice_date: new Date().toISOString().split("T")[0],
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Failed to create invoice:", error);
-    alert("Could not create invoice.");
-    return;
-  }
-
-  window.location.href = `/invoices?id=${data.id}`;
-}
-
-  window.location.href = `/invoices?id=${data.id}`;
-}
   function goHome() {
     window.location.href = "/";
   }
@@ -1191,3 +1203,4 @@ const infoGrid = {
     "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "14px",
 };
+```
