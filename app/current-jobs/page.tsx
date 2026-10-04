@@ -33,9 +33,11 @@ const DRAFT_KEY = "quotesnapDraft";
 
 export default function CurrentJobsPage() {
   const [jobs, setJobs] = useState<QuoteItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    loadJobs();
+    void loadJobs();
   }, []);
 
   function safeRead(key: string): QuoteItem[] {
@@ -59,42 +61,83 @@ export default function CurrentJobsPage() {
   }
 
   async function loadJobs() {
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .eq("status", "Approved")
-.order("scheduled_date", { ascending: true, nullsFirst: false })
-.order("approved_at", { ascending: false });
+    setLoading(true);
+    setLoadError("");
 
-  if (error) {
-    console.error("Failed to load current jobs:", error);
-    setJobs([]);
-    return;
+    try {
+      // Mobile browsers can restore the Supabase auth session a little later
+      // than desktop browsers. Give auth a moment to settle before querying.
+      const sessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(
+            () => reject(new Error("Timed out restoring your QuoteSnap session.")),
+            8000
+          )
+        ),
+      ]);
+
+      if (!sessionResult.data.session) {
+        setJobs([]);
+        setLoadError("Your QuoteSnap login session is not available on this device.");
+        return;
+      }
+
+      const queryResult = await Promise.race([
+        supabase
+          .from("quotes")
+          .select("*")
+          .eq("status", "Approved")
+          .order("scheduled_date", { ascending: true, nullsFirst: false })
+          .order("approved_at", { ascending: false }),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(
+            () => reject(new Error("Current Jobs took too long to load.")),
+            12000
+          )
+        ),
+      ]);
+
+      const { data, error } = queryResult;
+
+      if (error) {
+        throw error;
+      }
+
+      const approvedJobs: QuoteItem[] = (data || []).map((quote) => ({
+        id: quote.id,
+        quoteNumber: quote.quote_number || "",
+        clientName: quote.client_name || "",
+        projectAddress: quote.project_address || "",
+        contactInfo: quote.contact_info || "",
+        quoteDate: quote.quote_date || "",
+        projectTotal: quote.project_total || "",
+        startWindow: quote.start_window || "",
+        scopeOfWork: quote.scope_of_work || "",
+        bannerImage: quote.banner_image || "",
+        status: "Approved",
+        paymentStatus: quote.payment_status || "Unpaid",
+        approvedAt: quote.approved_at || undefined,
+        scheduledDate: quote.scheduled_date || undefined,
+        completedAt: quote.completed_at || undefined,
+        sentAt: quote.sent_at || undefined,
+        archivedAt: quote.archived_at || undefined,
+        archiveReason: quote.archive_reason || undefined,
+      }));
+
+      setJobs(approvedJobs);
+    } catch (error) {
+      console.error("Failed to load current jobs:", error);
+      setJobs([]);
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Current Jobs could not load on this device."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
-
-  const approvedJobs: QuoteItem[] = (data || []).map((quote) => ({
-    id: quote.id,
-    quoteNumber: quote.quote_number || "",
-    clientName: quote.client_name || "",
-    projectAddress: quote.project_address || "",
-    contactInfo: quote.contact_info || "",
-    quoteDate: quote.quote_date || "",
-    projectTotal: quote.project_total || "",
-    startWindow: quote.start_window || "",
-    scopeOfWork: quote.scope_of_work || "",
-    bannerImage: quote.banner_image || "",
-    status: "Approved",
-    paymentStatus: quote.payment_status || "Unpaid",
-    approvedAt: quote.approved_at || undefined,
-scheduledDate: quote.scheduled_date || undefined,
-    completedAt: quote.completed_at || undefined,
-    sentAt: quote.sent_at || undefined,
-    archivedAt: quote.archived_at || undefined,
-    archiveReason: quote.archive_reason || undefined,
-  }));
-
-  setJobs(approvedJobs);
-}
 
   function goHome() {
     window.location.href = "/";
@@ -283,7 +326,45 @@ async function scheduleJob(job: QuoteItem) {
             there. No more zombie quotes, ideally. What a concept.
           </p>
 
-          {jobs.length === 0 ? (
+          {loading ? (
+            <div
+              style={{
+                background: "#fafaf9",
+                border: "1px solid #e7e5e4",
+                borderRadius: "14px",
+                padding: "22px",
+                color: "#78716c",
+                textAlign: "center",
+              }}
+            >
+              Loading current jobs...
+            </div>
+          ) : loadError ? (
+            <div
+              style={{
+                background: "#fff7ed",
+                border: "1px solid #fdba74",
+                borderRadius: "14px",
+                padding: "22px",
+                color: "#9a3412",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: "8px" }}>
+                Current Jobs could not load.
+              </div>
+              <div style={{ marginBottom: "14px", fontSize: "14px" }}>
+                {loadError}
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadJobs()}
+                style={smallButton("#f97316", "#ffffff")}
+              >
+                Retry
+              </button>
+            </div>
+          ) : jobs.length === 0 ? (
             <div
               style={{
                 background: "#fafaf9",
