@@ -5,6 +5,7 @@ export default function DashboardPage() {
     const [openQuotes, setOpenQuotes] = useState(0);
   const [acceptedJobs, setAcceptedJobs] = useState(0);
   const [followUps, setFollowUps] = useState(0);
+    const [dueFollowUps, setDueFollowUps] = useState<any[]>([]);
   const [acceptedValue, setAcceptedValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -43,14 +44,26 @@ export default function DashboardPage() {
       }
 
       const { data: followUpData, error: followUpError } = await supabase
-        .from("quote_followups")
-        .select("id")
-        .eq("status", "Pending");
+  .from("quote_followups")
+  .select(`
+    id,
+    quote_id,
+    due_at,
+    status,
+    quotes (
+      client_name,
+      quote_number,
+      project_address
+    )
+  `)
+  .eq("status", "Pending")
+  .order("due_at", { ascending: true });
 
       if (followUpError) {
         console.error("Dashboard follow-up load failed:", followUpError);
       } else {
         setFollowUps(followUpData?.length || 0);
+          setDueFollowUps(followUpData || []);
       }
     } catch (error) {
       console.error("Dashboard load failed:", error);
@@ -195,7 +208,85 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+{/* NEEDS ATTENTION */}
+{dueFollowUps.length > 0 && (
+  <div
+    style={{
+      background: "#151515",
+      border: "1px solid #333",
+      borderRadius: "18px",
+      padding: "22px",
+      marginBottom: "20px",
+    }}
+  >
+    <div
+      style={{
+        fontSize: "13px",
+        color: "#f97316",
+        fontWeight: 800,
+        letterSpacing: "1px",
+        marginBottom: "16px",
+      }}
+    >
+      NEEDS ATTENTION
+    </div>
 
+    {dueFollowUps.map((followUp: any) => (
+      <div
+        key={followUp.id}
+        onClick={() => goTo("/follow-ups")}
+        style={{
+          background: "#202020",
+          border: "1px solid #333",
+          borderRadius: "14px",
+          padding: "16px",
+          marginBottom: "10px",
+          cursor: "pointer",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "16px",
+            fontWeight: 800,
+            marginBottom: "5px",
+          }}
+        >
+          {followUp.quotes?.client_name || "Customer"}
+        </div>
+
+        <div
+          style={{
+            color: "#aaa",
+            fontSize: "13px",
+            marginBottom: "4px",
+          }}
+        >
+          {followUp.quotes?.quote_number || "Quote"}
+        </div>
+
+        <div
+          style={{
+            color: "#aaa",
+            fontSize: "13px",
+            marginBottom: "8px",
+          }}
+        >
+          {followUp.quotes?.project_address || ""}
+        </div>
+
+        <div
+          style={{
+            color: "#f97316",
+            fontSize: "13px",
+            fontWeight: 700,
+          }}
+        >
+          Due: {new Date(followUp.due_at).toLocaleString()}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
         {/* QUICK ACTIONS */}
         <div
           style={{
