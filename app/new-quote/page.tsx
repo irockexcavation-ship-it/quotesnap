@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-
+import DirtTalk from "./DirtTalk";
 // D.I.R.T. Phase 1: transparent, local rules. No AI service or pricing guesses.
 type DirtResult = { scope: string; observations: string[]; questions: string[] };
 function buildDirtDraft(raw: string): DirtResult {
-  const notes = raw.trim();
+  const not
+  es = raw.trim();
   const lower = notes.toLowerCase();
   const observations: string[] = [];
   const questions: string[] = [];
@@ -378,6 +379,18 @@ project_total: Number(
                 {dirtBusy ? "D.I.R.T. is analyzing..." : "Analyze with D.I.R.T. AI"}
               </button>
             </div>
+            <DirtTalk
+  notes={dirtNotes}
+  draft={dirtResult}
+  onProposedRevision={(result, revisedNotes) => {
+    setDirtNotes(revisedNotes);
+    setDirtResult(result);
+    setDirtMode("ai");
+    setDirtMessage(
+      "Conversation revision approved for review. Use This Draft in Scope of Work when ready."
+    );
+  }}
+/>
             {dirtMessage && <p role="status" style={{ color: "#fdba74" }}>{dirtMessage}</p>}
             {dirtResult && <div style={{ background: "#ffffff", color: "#111827", borderRadius: "12px", padding: "16px", marginTop: "16px" }}>
               <strong>Internal estimating notes ({dirtMode === "ai" ? "AI" : "local"}) • NOT included in quote</strong>
