@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!auth.startsWith("Bearer ")) return err("Sign in to use D.I.R.T. AI.", 401);
     const token = auth.slice(7).trim();
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     const apiKey = process.env.OPENAI_API_KEY;
     if (!url || !anon) return err("Supabase configuration is missing on the server.", 503);
     if (!apiKey) return err("D.I.R.T. AI is not configured yet. Add OPENAI_API_KEY in Vercel.", 503);
