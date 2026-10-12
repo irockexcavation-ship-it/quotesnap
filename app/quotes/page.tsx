@@ -182,7 +182,7 @@ export default function QuotesPage() {
   }
 
   function goHome() {
-    window.location.href = "/";
+    window.location.href = "/dashboard";
   }
 
   function goArchive() {
@@ -212,15 +212,25 @@ export default function QuotesPage() {
     window.location.href = "/new-quote";
   }
 
-  function deleteQuote(quoteToDelete: QuoteItem) {
+  async function deleteQuote(quoteToDelete: QuoteItem) {
     const confirmed = window.confirm(
       `Delete quote for ${quoteToDelete.clientName || "this client"}?`
     );
 
     if (!confirmed) return;
 
-    const updated = quotes.filter((q) => q.id !== quoteToDelete.id);
-    saveActiveQuotes(updated);
+    const { error } = await supabase
+      .from("quotes")
+      .delete()
+      .eq("id", quoteToDelete.id);
+
+    if (error) {
+      console.error("Failed to delete quote:", error);
+      alert("Could not delete this quote. It may have related records. No data was removed from the list.");
+      return;
+    }
+
+    await loadQuotes();
   }
 
   async function updateStatus(
@@ -325,7 +335,7 @@ if (status === "Sent" && updatedQuote) {
       <div style={{ maxWidth: "860px", margin: "0 auto" }}>
         <div style={topNavRow}>
           <button onClick={goHome} style={navButton}>
-            Home
+            ← Dashboard
           </button>
 
           <button onClick={goCurrentJobs} style={navButton}>
@@ -341,7 +351,7 @@ if (status === "Sent" && updatedQuote) {
           <h1 style={title}>Quotes</h1>
 
           <p style={subtitle}>
-            Draft and sent quotes live here. Approved jobs move to Current Jobs. Sent quotes auto-archive after 30 days.
+            Draft and sent quotes live here. Approved jobs move to Current Jobs. Older sent quotes may require manual archiving.
           </p>
 
           <input
