@@ -7,14 +7,65 @@ import html2canvas from "html2canvas";
 import { PDFDocument } from "pdf-lib";
 import irockLogo from "../irock-logo.png";
 
-const COMPANY_NAME = "iRock Excavation & Hauling";
-const COMPANY_TAGLINE = "Rock Solid Driveway Systems";
-const COMPANY_PHONE = "(502) 552-9462";
-const COMPANY_EMAIL = "irockexcavation@gmail.com";
-const COMPANY_WEBSITE = "iRockX.com";
+type BusinessProfile = {
+  business_name: string | null;
+  name: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  website: string | null;
+  tagline: string | null;
+  logo_path: string | null;
+};
+
+const FALLBACK_COMPANY = {
+  name: "iRock Excavation & Hauling",
+  tagline: "Rock Solid Driveway Systems",
+  phone: "(502) 552-9462",
+  email: "irockexcavation@gmail.com",
+  website: "iRockX.com",
+  logo: irockLogo.src,
+};
+
+function logoUrlFromPath(path: string | null | undefined): string {
+  if (!path) return FALLBACK_COMPANY.logo;
+  if (/^https?:\/\//i.test(path)) return path;
+  return supabase.storage.from("business-logos").getPublicUrl(path).data.publicUrl;
+}
+
+async function logoAsPngDataUrl(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Image canvas unavailable");
+        context.drawImage(image, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (error) { reject(error); }
+    };
+    image.onerror = () => reject(new Error("Could not load company logo"));
+    image.src = url;
+  });
+}
 
 export default function PreviewPage() {
   const [quote, setQuote] = useState<any>(null);
+  const [business, setBusiness] = useState<BusinessProfile | null>(null);
+  const [businessLoading, setBusinessLoading] = useState(true);
+  const [businessError, setBusinessError] = useState("");
+
+  const companyName = business?.business_name?.trim() || business?.name?.trim() || FALLBACK_COMPANY.name;
+  const companyTagline = business?.tagline?.trim() || FALLBACK_COMPANY.tagline;
+  const companyPhone = business?.phone?.trim() || FALLBACK_COMPANY.phone;
+  const companyEmail = business?.email?.trim() || FALLBACK_COMPANY.email;
+  const companyWebsite = business?.website?.trim() || FALLBACK_COMPANY.website;
+  const companyLogo = logoUrlFromPath(business?.logo_path);
 
   useEffect(() => {
     const data = localStorage.getItem("quotesnapDraft");
@@ -22,6 +73,37 @@ export default function PreviewPage() {
     if (data) {
       setQuote(JSON.parse(data));
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadBusiness() {
+      try {
+        const { data: auth, error: authError } = await supabase.auth.getUser();
+        if (authError || !auth.user) throw authError || new Error("Not signed in");
+        const { data: member, error: memberError } = await supabase
+          .from("workspace_members")
+          .select("workspace_id")
+          .eq("user_id", auth.user.id)
+          .limit(1)
+          .single();
+        if (memberError || !member) throw memberError || new Error("No workspace found");
+        const { data: profile, error: profileError } = await supabase
+          .from("workspaces")
+          .select("name, business_name, contact_name, phone, email, address, website, tagline, logo_path")
+          .eq("id", member.workspace_id)
+          .single();
+        if (profileError || !profile) throw profileError || new Error("No business profile found");
+        if (active) setBusiness(profile as BusinessProfile);
+      } catch (error) {
+        console.error("Quote preview business profile load failed:", error);
+        if (active) setBusinessError("Business profile unavailable. Using original iRock branding.");
+      } finally {
+        if (active) setBusinessLoading(false);
+      }
+    }
+    void loadBusiness();
+    return () => { active = false; };
   }, []);
 
   if (!quote) {
@@ -164,15 +246,17 @@ function buildPhotoFileName() {
     );
 
     try {
-      pdf.addImage(
-        irockLogo.src,
-        "PNG",
-        margin + 4,
-        y + 4,
-        26,
-        18
-      );
-    } catch {}
+      const logoData = await logoAsPngDataUrl(companyLogo);
+      pdf.addImage(logoData, "PNG", margin + 4, y + 4, 26, 18);
+    } catch (logoError) {
+      console.warn("Saved logo unavailable in PDF, trying original logo:", logoError);
+      try {
+        const fallbackLogo = await logoAsPngDataUrl(FALLBACK_COMPANY.logo);
+        pdf.addImage(fallbackLogo, "PNG", margin + 4, y + 4, 26, 18);
+      } catch (fallbackError) {
+        console.warn("Could not render logo in PDF:", fallbackError);
+      }
+    }
 
     pdf.setTextColor(28, 25, 23);
 
@@ -184,7 +268,7 @@ function buildPhotoFileName() {
     pdf.setFontSize(18);
 
     pdf.text(
-      COMPANY_NAME,
+      companyName,
       margin + 34,
       y + 10
     );
@@ -199,25 +283,25 @@ function buildPhotoFileName() {
     pdf.setTextColor(87, 83, 78);
 
     pdf.text(
-      COMPANY_TAGLINE,
+      companyTagline,
       margin + 34,
       y + 17
     );
 
     pdf.text(
-      COMPANY_PHONE,
+      companyPhone,
       margin + 34,
       y + 23
     );
 
     pdf.text(
-      COMPANY_EMAIL,
+      companyEmail,
       margin + 34,
       y + 28
     );
 
     pdf.text(
-      COMPANY_WEBSITE,
+      companyWebsite,
       margin + 34,
       y + 33
     );
@@ -514,7 +598,7 @@ function buildPhotoFileName() {
       quote.includeAcceptanceLanguage
     ) {
       terms.push(
-        "Approval by reply, signature, or written confirmation authorizes iRock Excavation & Hauling to schedule and perform the work described in this quote."
+        `Approval by reply, signature, or written confirmation authorizes ${companyName} to schedule and perform the work described in this quote.`
       );
     }
 
@@ -527,7 +611,7 @@ function buildPhotoFileName() {
 
     addSection(
       "Next Steps",
-      "To move forward with this project, reply to this quote or contact iRock Excavation directly. Once approved, your project will be placed on the schedule. A current Certificate of Insurance is attached at the end of this PDF for your records."
+      `To move forward with this project, reply to this quote or contact ${companyName} directly. Once approved, your project will be placed on the schedule. A current Certificate of Insurance is attached at the end of this PDF for your records.`
     );
 
     const quotePdfBytes =
@@ -679,7 +763,7 @@ function buildPhotoFileName() {
     const message =
   "Hi " + client + ", here is your quote" + quoteNum + " for the project we discussed. " +
   "If you have any questions or want to move forward, let me know. " +
-  "- Kenny, iRock Excavation";
+  `- ${business?.contact_name?.trim() || "Kenny"}, ${companyName}`;
 
     window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
@@ -778,12 +862,13 @@ function buildPhotoFileName() {
 
         <button
           onClick={exportPDF}
+          disabled={businessLoading}
           style={topButton(
             "#f97316",
             "#ffffff"
           )}
         >
-          Export to PDF
+          {businessLoading ? "Loading Branding..." : "Export to PDF"}
         </button>
 
         <button
@@ -850,6 +935,11 @@ function buildPhotoFileName() {
         </button>
       </div>
 
+      {businessError && (
+        <div role="status" style={{ maxWidth: "900px", margin: "0 auto 14px", padding: "12px 16px", borderRadius: 10, background: "#fff7ed", color: "#9a3412" }}>
+          {businessError}
+        </div>
+      )}
       <div
         id="quote-card"
         style={{
@@ -883,6 +973,15 @@ function buildPhotoFileName() {
               "34px 32px 36px",
           }}
         >
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
+            <img src={companyLogo} alt={`${companyName} logo`} crossOrigin="anonymous" onError={(event) => { if (event.currentTarget.src !== new URL(FALLBACK_COMPANY.logo, window.location.href).href) event.currentTarget.src = FALLBACK_COMPANY.logo; }} style={{ maxWidth: 165, maxHeight: 90, objectFit: "contain" }} />
+            <div style={{ color: "#57534e", fontSize: 13, lineHeight: 1.6 }}>
+              <strong style={{ color: "#1c1917", fontSize: 17 }}>{companyName}</strong>
+              <div>{companyTagline}</div>
+              <div>{companyPhone} · {companyEmail}</div>
+              <div>{companyWebsite}</div>
+            </div>
+          </div>
           <h1
             style={{
               margin:
@@ -899,8 +998,7 @@ function buildPhotoFileName() {
               marginBottom: "24px",
             }}
           >
-            iRock Excavation &
-            Hauling
+            {companyName}
           </div>
 
           <div style={infoGrid}>
@@ -1062,27 +1160,14 @@ function buildPhotoFileName() {
                   signature, or
                   written
                   confirmation
-                  authorizes iRock
-                  Excavation &
-                  Hauling to
-                  schedule and
-                  perform the work
-                  described in
-                  this quote.
+                  authorizes {companyName} to schedule and perform the work described in this quote.
                 </p>
               )}
             </SectionCard>
           )}
 
           <SectionCard title="Next Steps">
-            To move forward with
-            this project, reply to
-            this quote or contact
-            iRock Excavation
-            directly. Once
-            approved, your project
-            will be placed on the
-            schedule.
+            To move forward with this project, reply to this quote or contact {companyName} directly. Once approved, your project will be placed on the schedule.
           </SectionCard>
         </div>
       </div>
