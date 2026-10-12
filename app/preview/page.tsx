@@ -54,6 +54,19 @@ async function logoAsPngDataUrl(url: string): Promise<string> {
   });
 }
 
+// Format display amounts only. Keep stored quote totals numeric/unchanged.
+function formatCurrency(value: unknown): string {
+  const cleaned = String(value ?? "").replace(/[$,\s]/g, "");
+  const amount = Number(cleaned);
+  if (!cleaned || !Number.isFinite(amount)) return "$0.00";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
 export default function PreviewPage() {
   const [quote, setQuote] = useState<any>(null);
   const [business, setBusiness] = useState<BusinessProfile | null>(null);
@@ -479,9 +492,7 @@ function buildPhotoFileName() {
     pdf.setFontSize(24);
 
     pdf.text(
-      String(
-        quote.projectTotal || "$0"
-      ),
+      formatCurrency(quote.projectTotal),
       margin + 6,
       y + 21
     );
@@ -1082,8 +1093,7 @@ function buildPhotoFileName() {
                 color: "#1c1917",
               }}
             >
-              {quote.projectTotal ||
-                "$0"}
+              {formatCurrency(quote.projectTotal)}
             </div>
           </div>
 
