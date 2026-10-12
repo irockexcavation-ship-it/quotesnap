@@ -47,13 +47,7 @@ function buildDirtDraft(raw: string): DirtResult {
   if (/\b(?:day|days)\b/.test(lower)) observations.push("Work duration was mentioned; verify the schedule before committing to a start window.");
   if (!actions.length) questions.push("Review the notes and write the exact work steps; no recognizable operation was detected.");
   questions.push("Verify site access, underground utilities, drainage, and exclusions before sending.");
-  const scope = [
-    "D.I.R.T. DRAFT SCOPE — REVIEW AND EDIT BEFORE SENDING",
-    ...actions.map((a, i) => `${i + 1}. ${a}`),
-    "",
-    "Field notes (verify details):",
-    notes,
-  ].join("\n");
+  const scope = actions.map((a, i) => `${i + 1}. ${a}`).join("\n");
   return { scope, observations, questions };
 }
 
@@ -61,6 +55,8 @@ export default function NewQuotePage() {
   const [dirtNotes, setDirtNotes] = useState("");
   const [dirtResult, setDirtResult] = useState<DirtResult | null>(null);
   const [dirtMessage, setDirtMessage] = useState("");
+  const [dirtBusy, setDirtBusy] = useState(false);
+  const [dirtMode, setDirtMode] = useState<"local" | "ai">("local");
   const [quoteId, setQuoteId] = useState("");
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
@@ -184,6 +180,33 @@ useEffect(() => {
 
     const compressed = await compressImage(file);
     setBannerImage(compressed);
+  }
+
+  async function analyzeWithAI() {
+    if (!dirtNotes.trim()) { setDirtMessage("Enter job notes first."); return; }
+    setDirtBusy(true);
+    setDirtMessage("");
+    setDirtResult(null);
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (sessionError || !token) throw new Error("Please sign in again to use D.I.R.T. AI.");
+      const response = await fetch("/api/dirt/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ notes: dirtNotes }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `AI request failed (${response.status}).`);
+      if (!body.scope || !Array.isArray(body.observations) || !Array.isArray(body.questions)) {
+        throw new Error("AI returned an unexpected result. Try again.");
+      }
+      setDirtResult({ scope: body.scope, observations: body.observations, questions: body.questions });
+      setDirtMode("ai");
+      setDirtMessage("AI analysis ready. Review the internal notes and customer-facing scope before using it.");
+    } catch (err) {
+      setDirtMessage(err instanceof Error ? err.message : "D.I.R.T. AI could not analyze these notes.");
+    } finally { setDirtBusy(false); }
   }
 
   async function saveQuote() {
@@ -338,31 +361,35 @@ project_total: Number(
           </div>
 
           <section style={{ background: "#111827", color: "#ffffff", borderRadius: "16px", padding: "20px", marginBottom: "24px" }}>
-            <div style={{ color: "#fb923c", fontWeight: 800, letterSpacing: "1px", fontSize: "13px" }}>D.I.R.T. • PHASE 1</div>
-            <h2 style={{ margin: "8px 0" }}>Job Notes → Draft Scope</h2>
+            <div style={{ color: "#fb923c", fontWeight: 800, letterSpacing: "1px", fontSize: "13px" }}>D.I.R.T. • DRAFT BUILDER</div>
+            <h2 style={{ margin: "8px 0" }}>Job Notes → Internal Analysis + Customer Scope</h2>
             <p style={{ color: "#d1d5db", lineHeight: 1.5, marginTop: 0 }}>
-              Describe the job in your own words. This prototype recognizes common operations and simple dimensions.
-              It does not use an AI model or calculate a selling price.
+              Describe the job in your own words. Use quick local rules or the real AI engine. Internal measurements and questions stay out of the customer-facing quote. Neither mode sets a selling price.
             </p>
             <textarea aria-label="D.I.R.T. job notes" value={dirtNotes} onChange={(e) => { setDirtNotes(e.target.value); setDirtMessage(""); }}
               placeholder="Example: 400 ft x 10 ft driveway, power rake, 2 inches DGA, compact with roller. Good access."
               rows={5} style={{ ...textareaStyle, minHeight: "130px", background: "#ffffff", color: "#111827" }} />
-            <button type="button" onClick={() => {
-              if (!dirtNotes.trim()) { setDirtMessage("Enter job notes first."); return; }
-              setDirtResult(buildDirtDraft(dirtNotes)); setDirtMessage("");
-            }} style={{ ...primaryButton, marginTop: "12px" }}>Analyze Job Notes</button>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "10px", marginTop: "12px" }}>
+              <button type="button" disabled={dirtBusy} onClick={() => {
+                if (!dirtNotes.trim()) { setDirtMessage("Enter job notes first."); return; }
+                setDirtResult(buildDirtDraft(dirtNotes)); setDirtMode("local"); setDirtMessage("Local analysis ready. Internal notes are separate from the quote scope.");
+              }} style={{ ...primaryButton, background: "#374151", opacity: dirtBusy ? 0.5 : 1 }}>Quick Local Analysis</button>
+              <button type="button" disabled={dirtBusy} onClick={analyzeWithAI} style={{ ...primaryButton, opacity: dirtBusy ? 0.5 : 1 }}>
+                {dirtBusy ? "D.I.R.T. is analyzing..." : "Analyze with D.I.R.T. AI"}
+              </button>
+            </div>
             {dirtMessage && <p role="status" style={{ color: "#fdba74" }}>{dirtMessage}</p>}
             {dirtResult && <div style={{ background: "#ffffff", color: "#111827", borderRadius: "12px", padding: "16px", marginTop: "16px" }}>
-              <strong>Measurements and observations</strong>
+              <strong>Internal estimating notes ({dirtMode === "ai" ? "AI" : "local"}) • NOT included in quote</strong>
               <ul>{dirtResult.observations.length ? dirtResult.observations.map((item, i) => <li key={i}>{item}</li>) : <li>No quantities calculated. Check your measurements.</li>}</ul>
-              <strong>Review before quoting</strong>
+              <strong>Questions and checks • NOT included in quote</strong>
               <ul>{dirtResult.questions.map((item, i) => <li key={i}>{item}</li>)}</ul>
-              <strong>Draft scope</strong>
+              <strong>Customer-facing scope • copied to quote only when you approve</strong>
               <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", lineHeight: 1.5, border: "1px solid #e5e7eb", padding: "12px", borderRadius: "8px" }}>{dirtResult.scope}</pre>
               <button type="button" style={primaryButton} onClick={() => {
                 if (scopeOfWork.trim() && !window.confirm("Replace the current Scope of Work with this D.I.R.T. draft?")) return;
                 setScopeOfWork(dirtResult.scope);
-                setDirtMessage("Draft copied into Scope of Work below. Review and edit it before previewing your quote.");
+                setDirtMessage("Customer-facing scope copied below. Internal notes and questions were NOT copied. Review before previewing your quote.");
               }}>Use This Draft in Scope of Work</button>
             </div>}
           </section>
