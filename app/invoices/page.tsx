@@ -86,7 +86,7 @@ export default function InvoicesPage() {
   }
 
   function goHome() {
-    window.location.href = "/";
+    window.location.href = "/dashboard";
   }
 
   function backToInvoices() {
@@ -227,7 +227,7 @@ export default function InvoicesPage() {
       "Hi " + client + ", here is " + invoiceNumber +
       " from iRock Excavation & Hauling. Balance due: " +
       money(balance) +
-      ". I am sending the invoice PDF with this message. Thank you! - Kenny";
+      ". I can provide the invoice PDF separately. Thank you! - Kenny";
 
     window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
@@ -250,6 +250,8 @@ export default function InvoicesPage() {
       alert(`Payment cannot be more than the remaining balance of ${money(balance)}.`);
       return;
     }
+
+    if (!window.confirm(`Record a payment of ${money(payment)} for ${selectedInvoice.client_name || "this customer"}?\nRemaining balance afterward: ${money(balance - payment)}. This will update the invoice.`)) return;
 
     const newAmountPaid = Math.min(alreadyPaid + payment, total);
     const newStatus =
@@ -372,7 +374,7 @@ export default function InvoicesPage() {
                 Back to Invoices
               </button>
               <button onClick={goHome} style={blackButton}>
-                Home
+                ← Dashboard
               </button>
             </div>
           </div>
@@ -521,7 +523,7 @@ export default function InvoicesPage() {
           </div>
 
           <button onClick={goHome} style={blackButton}>
-            Home
+            ← Dashboard
           </button>
         </div>
 
