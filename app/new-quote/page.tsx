@@ -2,7 +2,65 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+
+// D.I.R.T. Phase 1: transparent, local rules. No AI service or pricing guesses.
+type DirtResult = { scope: string; observations: string[]; questions: string[] };
+function buildDirtDraft(raw: string): DirtResult {
+  const notes = raw.trim();
+  const lower = notes.toLowerCase();
+  const observations: string[] = [];
+  const questions: string[] = [];
+  const actions: string[] = [];
+  const dimensions = notes.match(/\b(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\s*(?:x|×|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\b/i);
+  const lengthWidth = notes.match(/\b(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')\s*(?:long|length)\b[\s\S]{0,90}?\b(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')\s*(?:wide|width)\b/i);
+  const measure = dimensions || lengthWidth;
+  let squareFeet: number | null = null;
+  if (measure) {
+    const a = Number(measure[1]); const b = Number(measure[2]);
+    if (a > 0 && b > 0) {
+      squareFeet = a * b;
+      observations.push(`Rectangular area: ${a.toLocaleString()} ft × ${b.toLocaleString()} ft = ${squareFeet.toLocaleString()} sq ft (verify actual shape).`);
+    }
+  } else {
+    questions.push("Confirm length, width, and any irregular areas before estimating material.");
+  }
+  const depth = notes.match(/\b(\d+(?:\.\d+)?)\s*(?:inches|inch|in|\")\s*(?:deep|depth|thick|layer)?\b/i);
+  if (squareFeet !== null && depth) {
+    const inches = Number(depth[1]);
+    if (inches > 0 && inches <= 36) {
+      const yards = squareFeet * (inches / 12) / 27;
+      observations.push(`At ${inches} in uniform depth: approximately ${yards.toFixed(1)} cubic yards BEFORE compaction/waste. Confirm depth and material conversion before ordering.`);
+    }
+  } else if (/\bdga\b|\bgravel\b|\bstone\b|\b(?:#2|#3|#57)\b/.test(lower)) {
+    questions.push("Confirm finished stone depth and tonnage conversion with your supplier.");
+  }
+  if (/power.rak|harley.rak|soil.condition/.test(lower)) actions.push("Power rake and recondition the existing surface where specified.");
+  if (/grad(?:e|ing)|reshap|level|crown/.test(lower)) actions.push("Grade and shape the work area to the agreed drainage profile.");
+  if (/\bdga\b/.test(lower)) actions.push("Place and grade dense graded aggregate (DGA) to the approved depth.");
+  if (/\b#3\b|\bnumber 3\b/.test(lower)) actions.push("Install #3 stone base in the designated areas.");
+  if (/\b#2\b|\bnumber 2\b/.test(lower)) actions.push("Install #2 stone base in the designated areas.");
+  if (/fabric|geotextile/.test(lower)) actions.push("Install geotextile fabric in the agreed locations and specification.");
+  if (/roll|compact/.test(lower)) actions.push("Compact the finished aggregate with a vibratory roller where accessible.");
+  if (/culvert|cross.drain/.test(lower)) actions.push("Install or service the specified culvert/cross-drain after confirming pipe size, grade, and outlet.");
+  if (/ditch|swale|drainage/.test(lower)) actions.push("Shape drainage features to direct runoff to an approved outlet.");
+  if (/brush|clear(?:ing)?/.test(lower)) actions.push("Cut or clear vegetation within the agreed work limits.");
+  if (/\b(?:day|days)\b/.test(lower)) observations.push("Work duration was mentioned; verify the schedule before committing to a start window.");
+  if (!actions.length) questions.push("Review the notes and write the exact work steps; no recognizable operation was detected.");
+  questions.push("Verify site access, underground utilities, drainage, and exclusions before sending.");
+  const scope = [
+    "D.I.R.T. DRAFT SCOPE — REVIEW AND EDIT BEFORE SENDING",
+    ...actions.map((a, i) => `${i + 1}. ${a}`),
+    "",
+    "Field notes (verify details):",
+    notes,
+  ].join("\n");
+  return { scope, observations, questions };
+}
+
 export default function NewQuotePage() {
+  const [dirtNotes, setDirtNotes] = useState("");
+  const [dirtResult, setDirtResult] = useState<DirtResult | null>(null);
+  const [dirtMessage, setDirtMessage] = useState("");
   const [quoteId, setQuoteId] = useState("");
   const [clientName, setClientName] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
@@ -278,6 +336,36 @@ project_total: Number(
             <label style={labelStyle}>Estimated Start Window</label>
             <input value={startWindow} onChange={(e) => setStartWindow(e.target.value)} style={inputStyle} />
           </div>
+
+          <section style={{ background: "#111827", color: "#ffffff", borderRadius: "16px", padding: "20px", marginBottom: "24px" }}>
+            <div style={{ color: "#fb923c", fontWeight: 800, letterSpacing: "1px", fontSize: "13px" }}>D.I.R.T. • PHASE 1</div>
+            <h2 style={{ margin: "8px 0" }}>Job Notes → Draft Scope</h2>
+            <p style={{ color: "#d1d5db", lineHeight: 1.5, marginTop: 0 }}>
+              Describe the job in your own words. This prototype recognizes common operations and simple dimensions.
+              It does not use an AI model or calculate a selling price.
+            </p>
+            <textarea aria-label="D.I.R.T. job notes" value={dirtNotes} onChange={(e) => { setDirtNotes(e.target.value); setDirtMessage(""); }}
+              placeholder="Example: 400 ft x 10 ft driveway, power rake, 2 inches DGA, compact with roller. Good access."
+              rows={5} style={{ ...textareaStyle, minHeight: "130px", background: "#ffffff", color: "#111827" }} />
+            <button type="button" onClick={() => {
+              if (!dirtNotes.trim()) { setDirtMessage("Enter job notes first."); return; }
+              setDirtResult(buildDirtDraft(dirtNotes)); setDirtMessage("");
+            }} style={{ ...primaryButton, marginTop: "12px" }}>Analyze Job Notes</button>
+            {dirtMessage && <p role="status" style={{ color: "#fdba74" }}>{dirtMessage}</p>}
+            {dirtResult && <div style={{ background: "#ffffff", color: "#111827", borderRadius: "12px", padding: "16px", marginTop: "16px" }}>
+              <strong>Measurements and observations</strong>
+              <ul>{dirtResult.observations.length ? dirtResult.observations.map((item, i) => <li key={i}>{item}</li>) : <li>No quantities calculated. Check your measurements.</li>}</ul>
+              <strong>Review before quoting</strong>
+              <ul>{dirtResult.questions.map((item, i) => <li key={i}>{item}</li>)}</ul>
+              <strong>Draft scope</strong>
+              <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", lineHeight: 1.5, border: "1px solid #e5e7eb", padding: "12px", borderRadius: "8px" }}>{dirtResult.scope}</pre>
+              <button type="button" style={primaryButton} onClick={() => {
+                if (scopeOfWork.trim() && !window.confirm("Replace the current Scope of Work with this D.I.R.T. draft?")) return;
+                setScopeOfWork(dirtResult.scope);
+                setDirtMessage("Draft copied into Scope of Work below. Review and edit it before previewing your quote.");
+              }}>Use This Draft in Scope of Work</button>
+            </div>}
+          </section>
 
           <div style={fieldGroup}>
             <label style={labelStyle}>Scope of Work</label>
