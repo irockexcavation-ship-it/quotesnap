@@ -39,7 +39,7 @@ export default function DirtTalk({ notes, draft, onProposedRevision }: Props) {
       if (typeof body.reply !== "string" || typeof body.scope !== "string" ||
           typeof body.revisedNotes !== "string" || !Array.isArray(body.observations) || !Array.isArray(body.questions))
         throw new Error("D.I.R.T. returned an unexpected response.");
-      setHistory(h => [...h, { role: "user", content: text }, { role: "assistant", content: body.reply }].slice(-12));
+      setHistory(h => [...h, { role: "user" as const, content: text }, { role: "assistant" as const, content: body.reply }].slice(-12));
       setPending({ scope: body.scope, observations: body.observations, questions: body.questions, revisedNotes: body.revisedNotes });
       setMessage("");
     } catch (e) { setError(e instanceof Error ? e.message : "D.I.R.T. could not answer."); }
