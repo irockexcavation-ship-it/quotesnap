@@ -6,6 +6,7 @@ import jsPDF from "jspdf";
 
 type Invoice = {
   id: string;
+  workspace_id: string | null;
   invoice_number: string | null;
   client_name: string | null;
   project_address: string | null;
@@ -16,6 +17,26 @@ type Invoice = {
   due_date: string | null;
 };
 
+type BusinessProfile = {
+  business_name: string | null;
+  name: string | null;
+  tagline: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  website: string | null;
+  logo_path: string | null;
+};
+
+const FALLBACK_BUSINESS = {
+  name: "iRock Excavation & Hauling",
+  tagline: "Rock Solid Driveway Systems",
+  phone: "(502) 552-9462",
+  email: "irockexcavation@gmail.com",
+  website: "iRockX.com",
+  address: "",
+};
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -23,6 +44,10 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [savingPayment, setSavingPayment] = useState(false);
+  const [business, setBusiness] = useState<BusinessProfile | null>(null);
+  const [businessLoading, setBusinessLoading] = useState(false);
+  const [businessError, setBusinessError] = useState("");
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -42,7 +67,7 @@ export default function InvoicesPage() {
     const { data, error } = await supabase
       .from("invoices")
       .select(
-        "id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
+        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
       )
       .order("created_at", { ascending: false });
 
@@ -62,7 +87,7 @@ export default function InvoicesPage() {
     const { data, error } = await supabase
       .from("invoices")
       .select(
-        "id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
+        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
       )
       .eq("id", id)
       .single();
@@ -76,6 +101,67 @@ export default function InvoicesPage() {
 
     setSelectedInvoice(data);
     setLoading(false);
+    if (data.workspace_id) {
+      await loadBusinessProfile(data.workspace_id);
+    } else {
+      setBusinessError("Invoice has no workspace association. Using fallback business information.");
+    }
+  }
+
+  async function loadBusinessProfile(workspaceId: string) {
+    setBusinessLoading(true);
+    setBusinessError("");
+    const { data, error } = await supabase
+      .from("workspaces")
+      .select("name, business_name, tagline, phone, email, address, website, logo_path")
+      .eq("id", workspaceId)
+      .single();
+    if (error || !data) {
+      console.error("Could not load invoice business profile:", error);
+      setBusinessError("Business profile unavailable. Invoice will use fallback company details.");
+      setBusiness(null);
+    } else {
+      setBusiness(data);
+    }
+    setBusinessLoading(false);
+  }
+
+  const companyName = business?.business_name?.trim() || business?.name?.trim() || FALLBACK_BUSINESS.name;
+  const companyTagline = business?.tagline?.trim() || FALLBACK_BUSINESS.tagline;
+  const companyPhone = business?.phone?.trim() || FALLBACK_BUSINESS.phone;
+  const companyEmail = business?.email?.trim() || FALLBACK_BUSINESS.email;
+  const companyWebsite = business?.website?.trim() || FALLBACK_BUSINESS.website;
+  const companyAddress = business?.address?.trim() || FALLBACK_BUSINESS.address;
+  const logoUrl = business?.logo_path
+    ? supabase.storage.from("business-logos").getPublicUrl(business.logo_path).data.publicUrl
+    : "";
+
+  // Convert a remote logo into a PNG data URL for reliable jsPDF embedding.
+  async function logoForPDF(url: string): Promise<string | null> {
+    if (!url) return null;
+    try {
+      const response = await fetch(url, { mode: "cors" });
+      if (!response.ok) throw new Error(`Logo fetch failed (${response.status})`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const image = new Image();
+        image.src = objectUrl;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) return null;
+        context.drawImage(image, 0, 0);
+        return canvas.toDataURL("image/png");
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (error) {
+      console.warn("Invoice logo unavailable for PDF:", error);
+      return null;
+    }
   }
 
   function money(value: number | null) {
@@ -106,112 +192,110 @@ export default function InvoicesPage() {
     return client + "_" + number + ".pdf";
   }
 
-  function exportInvoicePDF() {
-    if (!selectedInvoice) return;
+  async function exportInvoicePDF() {
+    if (!selectedInvoice || exportingPDF || businessLoading) return;
+    setExportingPDF(true);
+    try {
+      const total = Number(selectedInvoice.total || 0);
+      const paid = Number(selectedInvoice.amount_paid || 0);
+      const balance = Math.max(total - paid, 0);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const margin = 18;
+      const right = 192;
+      let y = 20;
+      const logo = await logoForPDF(logoUrl);
+      let textX = margin;
+      if (logo) {
+        try {
+          const props = pdf.getImageProperties(logo);
+          const maxW = 31;
+          const maxH = 23;
+          const ratio = Math.min(maxW / props.width, maxH / props.height);
+          pdf.addImage(logo, "PNG", margin, y, props.width * ratio, props.height * ratio);
+          textX = margin + 36;
+        } catch (error) {
+          console.warn("Could not embed company logo:", error);
+        }
+      }
 
-    const total = Number(selectedInvoice.total || 0);
-    const paid = Number(selectedInvoice.amount_paid || 0);
-    const balance = Math.max(total - paid, 0);
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    let y = 20;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(22);
-    pdf.text("iRock Excavation & Hauling", 18, y);
-
-    y += 8;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(11);
-    pdf.text("Rock Solid Driveway Systems", 18, y);
-
-    y += 6;
-    pdf.text("(502) 552-9462", 18, y);
-    y += 6;
-    pdf.text("irockexcavation@gmail.com", 18, y);
-    y += 6;
-    pdf.text("iRockX.com", 18, y);
-
-    y += 14;
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text("INVOICE", 18, y);
-
-    y += 10;
-    pdf.setFontSize(11);
-    pdf.text("Invoice #:", 18, y);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(selectedInvoice.invoice_number || "-", 48, y);
-
-    y += 7;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Invoice Date:", 18, y);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(selectedInvoice.invoice_date || "-", 48, y);
-
-    if (selectedInvoice.due_date) {
-      y += 7;
+      const headerWidth = right - textX;
       pdf.setFont("helvetica", "bold");
-      pdf.text("Due Date:", 18, y);
+      pdf.setFontSize(17);
+      const nameLines = pdf.splitTextToSize(companyName, headerWidth);
+      pdf.text(nameLines, textX, y + 5);
+      let detailY = y + 5 + nameLines.length * 6;
       pdf.setFont("helvetica", "normal");
-      pdf.text(selectedInvoice.due_date, 48, y);
-    }
+      pdf.setFontSize(9);
+      const details = [companyTagline, companyPhone, companyEmail, companyWebsite, companyAddress].filter(Boolean);
+      for (const detail of details) {
+        const lines = pdf.splitTextToSize(detail, headerWidth);
+        pdf.text(lines, textX, detailY);
+        detailY += lines.length * 4.8;
+      }
+      y = Math.max(detailY + 10, 55);
+      pdf.setDrawColor(220);
+      pdf.line(margin, y - 5, right, y - 5);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.text("INVOICE", margin, y + 4);
+      y += 16;
 
-    y += 12;
-    pdf.setDrawColor(210);
-    pdf.line(18, y, 192, y);
+      pdf.setFontSize(11);
+      const addLabel = (label: string, value: string) => {
+        pdf.setFont("helvetica", "bold");
+        pdf.text(label, margin, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(value, 51, y);
+        y += 7;
+      };
+      addLabel("Invoice #:", selectedInvoice.invoice_number || "-");
+      addLabel("Invoice Date:", selectedInvoice.invoice_date || "-");
+      if (selectedInvoice.due_date) addLabel("Due Date:", selectedInvoice.due_date);
 
-    y += 10;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Bill To", 18, y);
-
-    y += 7;
-    pdf.setFont("helvetica", "normal");
-    pdf.text(selectedInvoice.client_name || "Unnamed Client", 18, y);
-
-    if (selectedInvoice.project_address) {
+      y += 4;
+      pdf.line(margin, y, right, y);
+      y += 10;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Bill To", margin, y);
       y += 7;
-      const addressLines = pdf.splitTextToSize(
-        selectedInvoice.project_address,
-        174
-      );
-      pdf.text(addressLines, 18, y);
-      y += (addressLines.length - 1) * 6;
+      pdf.setFont("helvetica", "normal");
+      const clientLines = pdf.splitTextToSize(selectedInvoice.client_name || "Unnamed Client", 174);
+      pdf.text(clientLines, margin, y);
+      y += clientLines.length * 6;
+      if (selectedInvoice.project_address) {
+        const addressLines = pdf.splitTextToSize(selectedInvoice.project_address, 174);
+        pdf.text(addressLines, margin, y);
+        y += addressLines.length * 6;
+      }
+      y += 8;
+      pdf.line(margin, y, right, y);
+      y += 12;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text("Total", margin, y);
+      pdf.text(money(total), right, y, { align: "right" });
+      y += 9;
+      pdf.text("Paid", margin, y);
+      pdf.text(money(paid), right, y, { align: "right" });
+      y += 9;
+      pdf.setFontSize(14);
+      pdf.text("Balance Due", margin, y);
+      pdf.text(money(balance), right, y, { align: "right" });
+      y += 14;
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Status: " + (selectedInvoice.status || "Draft"), margin, y);
+      y += 16;
+      pdf.setFont("helvetica", "bold");
+      const thanks = pdf.splitTextToSize(`Thank you for choosing ${companyName}.`, 174);
+      pdf.text(thanks, margin, y);
+      pdf.save(buildInvoiceFileName(selectedInvoice));
+    } catch (error) {
+      console.error("Failed to export invoice PDF:", error);
+      alert("Could not export the invoice PDF. Please try again.");
+    } finally {
+      setExportingPDF(false);
     }
-
-    y += 14;
-    pdf.setDrawColor(210);
-    pdf.line(18, y, 192, y);
-
-    y += 12;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Total", 18, y);
-    pdf.text(money(total), 192, y, { align: "right" });
-
-    y += 9;
-    pdf.text("Paid", 18, y);
-    pdf.text(money(paid), 192, y, { align: "right" });
-
-    y += 9;
-    pdf.setFontSize(14);
-    pdf.text("Balance Due", 18, y);
-    pdf.text(money(balance), 192, y, { align: "right" });
-
-    y += 14;
-    pdf.setFontSize(11);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Status: " + (selectedInvoice.status || "Draft"), 18, y);
-
-    y += 16;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Thank you for choosing iRock Excavation & Hauling.", 18, y);
-
-    pdf.save(buildInvoiceFileName(selectedInvoice));
   }
 
   function sendInvoiceText() {
@@ -225,7 +309,7 @@ export default function InvoicesPage() {
 
     const message =
       "Hi " + client + ", here is " + invoiceNumber +
-      " from iRock Excavation & Hauling. Balance due: " +
+      " from " + companyName + ". Balance due: " +
       money(balance) +
       ". I can provide the invoice PDF separately. Thank you! - Kenny";
 
@@ -277,7 +361,7 @@ export default function InvoicesPage() {
       .update(updates)
       .eq("id", selectedInvoice.id)
       .select(
-        "id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
+        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
       )
       .single();
 
@@ -364,8 +448,8 @@ export default function InvoicesPage() {
             </div>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <button onClick={exportInvoicePDF} style={greenButton}>
-                Export Invoice PDF
+              <button onClick={exportInvoicePDF} disabled={exportingPDF || businessLoading} style={{ ...greenButton, opacity: exportingPDF || businessLoading ? 0.6 : 1 }}>
+                {exportingPDF ? "Exporting..." : businessLoading ? "Loading branding..." : "Export Invoice PDF"}
               </button>
               <button onClick={sendInvoiceText} style={greenButton}>
                 Send Invoice Text
@@ -379,6 +463,17 @@ export default function InvoicesPage() {
             </div>
           </div>
 
+          {businessError && <div style={{ marginBottom: "12px", color: "#9a3412", fontSize: "13px" }}>{businessError}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: "18px", flexWrap: "wrap", marginBottom: "20px", padding: "18px", border: "1px solid #e7e5e4", borderRadius: "14px", background: "#fafaf9" }}>
+            {logoUrl && <img src={logoUrl} alt={`${companyName} logo`} style={{ width: "140px", maxHeight: "90px", objectFit: "contain" }} />}
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+              <div style={{ fontWeight: 800, fontSize: "22px" }}>{companyName}</div>
+              {companyTagline && <div style={{ color: "#57534e", marginTop: "4px" }}>{companyTagline}</div>}
+              <div style={{ fontSize: "13px", color: "#57534e", marginTop: "6px", overflowWrap: "anywhere" }}>{[companyPhone, companyEmail].filter(Boolean).join(" · ")}</div>
+              {companyWebsite && <div style={{ fontSize: "13px", color: "#57534e", overflowWrap: "anywhere" }}>{companyWebsite}</div>}
+              {companyAddress && <div style={{ fontSize: "13px", color: "#57534e", overflowWrap: "anywhere" }}>{companyAddress}</div>}
+            </div>
+          </div>
           <div
             style={{
               border: "1px solid #ddd",
