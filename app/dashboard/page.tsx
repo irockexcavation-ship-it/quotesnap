@@ -149,6 +149,12 @@ setCurrentJobs(accepted);
             >
               CONTROL CENTER
             </div>
+            <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "13px", letterSpacing: "2px", marginTop: "12px" }}>
+              DIRT DON&apos;T LIE.
+            </div>
+            <div style={{ color: "#aaa", fontSize: "11px", letterSpacing: "1px", marginTop: "5px" }}>
+              BY iROCK INDUSTRIES · BUILT FROM THE GROUND UP
+            </div>
           </div>
 
           <div
@@ -465,7 +471,7 @@ setCurrentJobs(accepted);
             <Action
               icon="⚙"
               label="SETTINGS"
-              onClick={() => alert("Coming soon")}
+              onClick={() => goTo("/settings")}
             />
           </div>
         </div>
