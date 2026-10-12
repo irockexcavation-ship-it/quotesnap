@@ -463,6 +463,12 @@ setCurrentJobs(accepted);
             />
 
             <Action
+              icon="🧾"
+              label="INVOICES"
+              onClick={() => goTo("/invoices")}
+            />
+
+            <Action
               icon="📦"
               label="ARCHIVE"
               onClick={() => goTo("/archive")}
