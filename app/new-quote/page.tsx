@@ -6,8 +6,8 @@ import DirtTalk from "./DirtTalk";
 // D.I.R.T. Phase 1: transparent, local rules. No AI service or pricing guesses.
 type DirtResult = { scope: string; observations: string[]; questions: string[] };
 function buildDirtDraft(raw: string): DirtResult {
-  const not
-  es = raw.trim();
+ const notes = raw.trim();
+ 
   const lower = notes.toLowerCase();
   const observations: string[] = [];
   const questions: string[] = [];
