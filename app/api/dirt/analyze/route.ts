@@ -21,7 +21,7 @@ function measurementNotes(notes: string): string[] {
   if (!(length > 0 && width > 0 && length <= 100000 && width <= 100000)) return results;
   const area = length * width;
   results.push(`Rectangular area: ${length.toLocaleString("en-US")} ft × ${width.toLocaleString("en-US")} ft = ${area.toLocaleString("en-US")} sq ft. Verify actual shape.`);
-  const depthMatch = notes.match(/\b(?:add|apply|spread|place|install|topcoat|layer(?:\s+of)?)\s*(?:approximately|about|roughly|around)?\s*(\d+(?:\.\d+)?)\s*(?:inches|inch|in|")\b?/i)
+    const depthMatch = notes.match(/\b(?:add|apply|spread|place|install|topcoat|layer(?:\s+of)?)\s*(?:approximately|about|roughly|around)?\s*(\d+(?:\.\d+)?)\s*(?:inches|inch|in|")/i)
     || notes.match(/\b(\d+(?:\.\d+)?)\s*(?:inches|inch|in)\s*(?:of\s+)?(?:dga|aggregate|stone|gravel|depth|layer)\b/i);
   if (depthMatch) {
     const inches = Number(depthMatch[1]);
