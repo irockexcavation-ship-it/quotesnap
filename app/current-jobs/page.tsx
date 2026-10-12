@@ -140,7 +140,7 @@ export default function CurrentJobsPage() {
   }
 
   function goHome() {
-    window.location.href = "/";
+    window.location.href = "/dashboard";
   }
 
   function goQuotes() {
@@ -176,6 +176,7 @@ export default function CurrentJobsPage() {
 }
 
   async function markPaid(job: QuoteItem) {
+    if (!window.confirm("Mark this job Paid? This updates the job status only, not any linked invoice or payment record.")) return;
   const { error } = await supabase
     .from("quotes")
     .update({
@@ -282,7 +283,7 @@ async function scheduleJob(job: QuoteItem) {
           }}
         >
           <button onClick={goHome} style={navButton}>
-            Home
+            ← Dashboard
           </button>
 
           <button onClick={goQuotes} style={navButton}>
