@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import irockLogo from "../../irock-logo.png";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,11 +81,14 @@ export default async function CustomerQuotePage({
     console.warn("Quote link tracking unavailable:", trackingError);
   }
 
-  const { data: business } = await admin
+  const { data: business, error: businessError } = await admin
     .from("workspaces")
     .select("name, business_name, phone, website, tagline, logo_path")
     .eq("id", link.workspace_id)
     .maybeSingle();
+
+  if (businessError) console.error("Customer quote business profile lookup failed:", businessError);
+  if (!business && !businessError) console.warn("Customer quote business profile not found for linked workspace.");
 
   const companyName = business?.business_name?.trim() || business?.name?.trim() || "iRock Excavation & Hauling";
   const companyPhone = business?.phone?.trim() || "(502) 552-9462";
@@ -97,7 +99,7 @@ export default async function CustomerQuotePage({
     ? /^https?:\/\//i.test(logoPath)
       ? logoPath
       : admin.storage.from("business-logos").getPublicUrl(logoPath).data.publicUrl
-    : irockLogo.src;
+    : null;
 
   const q = (link.quote_snapshot || {}) as QuoteSnapshot;
   const terms = [
@@ -116,8 +118,10 @@ export default async function CustomerQuotePage({
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
         <header style={{ background: "#1c1917", color: "white", borderRadius: 16, padding: "25px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt={`${companyName} logo`} style={{ width: 82, height: 72, objectFit: "contain" }} />
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={`${companyName} logo`} style={{ width: 82, height: 72, objectFit: "contain" }} />
+            )}
             <div>
               <div style={{ fontSize: 23, fontWeight: 900 }}>{companyName}</div>
               <div style={{ color: "#fdba74", marginTop: 7, fontSize: 13, letterSpacing: 1 }}>{companyTagline}</div>
