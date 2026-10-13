@@ -123,7 +123,7 @@ export default async function CustomerQuotePage({
               <img src={logoUrl} alt={`${companyName} logo`} style={{ width: 82, height: 72, objectFit: "contain" }} />
             )}
             <div>
-              <div style={{ fontSize: 23, fontWeight: 900 }}>{companyName}</div>
+              {!logoUrl && <div style={{ fontSize: 23, fontWeight: 900 }}>{companyName}</div>}
               <div style={{ color: "#fdba74", marginTop: 7, fontSize: 13, letterSpacing: 1 }}>{companyTagline}</div>
               <div style={{ marginTop: 12, fontSize: 13 }}>{companyPhone} · {companyWebsite}</div>
             </div>
@@ -169,6 +169,9 @@ export default async function CustomerQuotePage({
           <p style={{ lineHeight: 1.7 }}>To approve this quote or ask a question, contact iRock Excavation &amp; Hauling. Online acceptance is coming soon.</p>
           <a href={`tel:${companyPhone.replace(/[^\d+]/g, "")}`} style={{ display: "inline-block", background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call iRock</a>
         </section>
+        <footer style={{ textAlign: "center", marginTop: 24, fontSize: 12, color: "#78716c" }}>
+          Proposal issued by {companyName}
+        </footer>
       </div>
     </main>
   );
