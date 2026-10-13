@@ -52,9 +52,7 @@ setCurrentJobs(accepted);
     due_at,
     status,
     quotes (
-      client_name,
-      quote_number,
-      project_address
+      *
     )
   `)
   .eq("status", "Pending")
@@ -72,6 +70,39 @@ setCurrentJobs(accepted);
 
     setLoading(false);
   }
+  // Preview expects camelCase fields under quotesnapDraft.
+  // Supabase rows use snake_case, so normalize them before navigating.
+  function openQuotePreview(record: any) {
+    if (!record?.id) {
+      alert("Could not open this quote. Please try again from Quotes.");
+      return;
+    }
+
+    const previewQuote = {
+      id: record.id,
+      quoteNumber: record.quote_number || "",
+      clientName: record.client_name || "",
+      projectAddress: record.project_address || "",
+      contactInfo: record.contact_info || "",
+      quoteDate: record.quote_date || "",
+      projectTotal: record.project_total ?? "",
+      startWindow: record.start_window || "",
+      scopeOfWork: record.scope_of_work || "",
+      bannerImage: record.banner_image || "",
+      status: record.status || "Draft",
+      paymentStatus: record.payment_status || "Unpaid",
+      approvedAt: record.approved_at || "",
+      scheduledDate: record.scheduled_date || "",
+      completedAt: record.completed_at || "",
+      sentAt: record.sent_at || "",
+      archivedAt: record.archived_at || "",
+      archiveReason: record.archive_reason || "",
+    };
+
+    localStorage.setItem("quotesnapDraft", JSON.stringify(previewQuote));
+    window.location.href = "/preview";
+  }
+
   const goTo = (path: string) => {
     window.location.href = path;
   };
@@ -241,11 +272,7 @@ setCurrentJobs(accepted);
     {dueFollowUps.map((followUp: any) => (
       <div
         key={followUp.id}
-        onClick={() => {
-    if (!followUp.quotes) return;
-    localStorage.setItem("quotesnapEditDraft", JSON.stringify(followUp.quotes));
-    window.location.href = "/preview";
-}}
+        onClick={() => openQuotePreview(followUp.quotes)}
         style={{
           background: "#202020",
           border: "1px solid #333",
@@ -324,10 +351,7 @@ setCurrentJobs(accepted);
     {currentJobs.map((job: any) => (
       <div
         key={job.id}
-        onClick={() => {
-    localStorage.setItem("quotesnapEditDraft", JSON.stringify(job));
-    window.location.href = "/preview";
-}}
+        onClick={() => openQuotePreview(job)}
         style={{
           background: "#202020",
           border: "1px solid #333",
