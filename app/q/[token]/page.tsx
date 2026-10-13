@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import irockLogo from "../../irock-logo.png";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,13 +62,42 @@ export default async function CustomerQuotePage({
   const hash = createHash("sha256").update(token).digest("hex");
   const { data: link, error } = await admin
     .from("quote_share_links")
-    .select("id, quote_snapshot, revoked_at, expires_at")
+    .select("id, workspace_id, quote_snapshot, revoked_at, expires_at")
     .eq("token_hash", hash)
     .maybeSingle();
 
   if (error || !link || link.revoked_at || (link.expires_at && Date.parse(link.expires_at) <= Date.now())) {
     return <Message heading="Link unavailable" body="This quote link is no longer available. Please contact iRock Excavation & Hauling for a new link." />;
   }
+
+  // Count valid link opens. This is an access count, not proof a human read the quote.
+  // A tracking failure must never prevent a customer from viewing the quote.
+  try {
+    const { data: tracked, error: trackingError } = await admin.rpc("record_quote_link_view", {
+      p_link_id: link.id,
+    });
+    if (trackingError) console.warn("Quote link tracking unavailable:", trackingError.message);
+    void tracked;
+  } catch (trackingError) {
+    console.warn("Quote link tracking unavailable:", trackingError);
+  }
+
+  const { data: business } = await admin
+    .from("workspaces")
+    .select("name, business_name, phone, website, tagline, logo_path")
+    .eq("id", link.workspace_id)
+    .maybeSingle();
+
+  const companyName = business?.business_name?.trim() || business?.name?.trim() || "iRock Excavation & Hauling";
+  const companyPhone = business?.phone?.trim() || "(502) 552-9462";
+  const companyWebsite = business?.website?.trim() || "iRockX.com";
+  const companyTagline = business?.tagline?.trim() || "ROCK SOLID RESULTS";
+  const logoPath = business?.logo_path?.trim();
+  const logoUrl = logoPath
+    ? /^https?:\/\//i.test(logoPath)
+      ? logoPath
+      : admin.storage.from("business-logos").getPublicUrl(logoPath).data.publicUrl
+    : irockLogo.src;
 
   const q = (link.quote_snapshot || {}) as QuoteSnapshot;
   const terms = [
@@ -85,9 +115,15 @@ export default async function CustomerQuotePage({
     <main style={{ background: "#f5f5f4", minHeight: "100vh", padding: "22px 14px 55px", fontFamily: "Arial, sans-serif", color: "#1c1917" }}>
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
         <header style={{ background: "#1c1917", color: "white", borderRadius: 16, padding: "25px 24px" }}>
-          <div style={{ fontSize: 23, fontWeight: 900 }}>iRock Excavation &amp; Hauling</div>
-          <div style={{ color: "#fdba74", marginTop: 7, fontSize: 13, letterSpacing: 1 }}>ROCK SOLID RESULTS</div>
-          <div style={{ marginTop: 12, fontSize: 13 }}>502-552-9462 · iRockX.com</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt={`${companyName} logo`} style={{ width: 82, height: 72, objectFit: "contain" }} />
+            <div>
+              <div style={{ fontSize: 23, fontWeight: 900 }}>{companyName}</div>
+              <div style={{ color: "#fdba74", marginTop: 7, fontSize: 13, letterSpacing: 1 }}>{companyTagline}</div>
+              <div style={{ marginTop: 12, fontSize: 13 }}>{companyPhone} · {companyWebsite}</div>
+            </div>
+          </div>
         </header>
 
         {q.bannerImage && /^https?:\/\//i.test(q.bannerImage) && (
@@ -127,7 +163,7 @@ export default async function CustomerQuotePage({
         <section style={section}>
           <h2 style={{ marginTop: 0 }}>Ready to move forward?</h2>
           <p style={{ lineHeight: 1.7 }}>To approve this quote or ask a question, contact iRock Excavation &amp; Hauling. Online acceptance is coming soon.</p>
-          <a href="tel:+15025529462" style={{ display: "inline-block", background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call iRock</a>
+          <a href={`tel:${companyPhone.replace(/[^\d+]/g, "")}`} style={{ display: "inline-block", background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call iRock</a>
         </section>
       </div>
     </main>
