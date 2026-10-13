@@ -19,7 +19,7 @@ type QuoteItem = {
  status?: QuoteStatus;
 paymentStatus?: PaymentStatus;
 approvedAt?: string;
-  acceptedName?: string;
+acceptedName?: string;
 acceptedAt?: string;
 scheduledDate?: string;
 completedAt?: string;
@@ -131,11 +131,7 @@ export default function CurrentJobsPage() {
       // If access is restricted, the existing jobs list must still work.
       if (approvedJobs.length > 0) {
         const { data: approvals, error: approvalsError } = await supabase
-          .from("quote_share_links")
-          .select("quote_id, accepted_name, accepted_at")
-          .in("quote_id", approvedJobs.map((job) => job.id))
-          .not("accepted_at", "is", null)
-          .order("accepted_at", { ascending: false });
+          .rpc("get_customer_approvals");
 
         if (!approvalsError && approvals) {
           const latestByQuote = new Map<string, { accepted_name: string | null; accepted_at: string | null }>();
@@ -152,7 +148,7 @@ export default function CurrentJobsPage() {
             }
           }
         } else if (approvalsError) {
-          console.info("Customer acceptance names are not readable with the current permissions.");
+          console.info("Customer approval lookup failed:");
         }
       }
 
