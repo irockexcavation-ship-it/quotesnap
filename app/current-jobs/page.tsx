@@ -125,6 +125,35 @@ export default function CurrentJobsPage() {
         archiveReason: quote.archive_reason || undefined,
       }));
 
+      // Approval names are kept in quote_share_links, separate from quotes.
+      // If access is restricted, the existing jobs list must still work.
+      if (approvedJobs.length > 0) {
+        const { data: approvals, error: approvalsError } = await supabase
+          .from("quote_share_links")
+          .select("quote_id, accepted_name, accepted_at")
+          .in("quote_id", approvedJobs.map((job) => job.id))
+          .not("accepted_at", "is", null)
+          .order("accepted_at", { ascending: false });
+
+        if (!approvalsError && approvals) {
+          const latestByQuote = new Map<string, { accepted_name: string | null; accepted_at: string | null }>();
+          for (const approval of approvals) {
+            if (!latestByQuote.has(approval.quote_id)) {
+              latestByQuote.set(approval.quote_id, approval);
+            }
+          }
+          for (const job of approvedJobs) {
+            const approval = latestByQuote.get(job.id);
+            if (approval) {
+              job.acceptedName = approval.accepted_name || undefined;
+              job.acceptedAt = approval.accepted_at || undefined;
+            }
+          }
+        } else if (approvalsError) {
+          console.info("Customer acceptance names are not readable with the current permissions.");
+        }
+      }
+
       setJobs(approvedJobs);
     } catch (error) {
       console.error("Failed to load current jobs:", error);
@@ -433,7 +462,34 @@ async function scheduleJob(job: QuoteItem) {
                         }}
                       >
                         {job.projectAddress || ""}
-                      </div>{job.scheduledDate && (
+                      </div>
+                      {(job.acceptedAt || job.approvedAt || job.acceptedName) && (
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            color: "#166534",
+                            lineHeight: 1.6,
+                            marginTop: "8px",
+                            marginBottom: "6px",
+                            padding: "9px 11px",
+                            background: "#f0fdf4",
+                            border: "1px solid #bbf7d0",
+                            borderRadius: "10px",
+                          }}
+                        >
+                          <strong>Customer approval</strong>
+                          {job.acceptedName && <div>Approved by: {job.acceptedName}</div>}
+                          {(job.acceptedAt || job.approvedAt) && (
+                            <div>
+                              Approved on: {new Date(job.acceptedAt || job.approvedAt || "").toLocaleString("en-US", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {job.scheduledDate && (
   <div
     style={{
       fontSize: "13px",
