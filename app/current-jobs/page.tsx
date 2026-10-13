@@ -19,6 +19,8 @@ type QuoteItem = {
  status?: QuoteStatus;
 paymentStatus?: PaymentStatus;
 approvedAt?: string;
+  acceptedName?: string;
+acceptedAt?: string;
 scheduledDate?: string;
 completedAt?: string;
 sentAt?: string;
