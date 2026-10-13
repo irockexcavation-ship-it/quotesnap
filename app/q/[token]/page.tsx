@@ -130,7 +130,7 @@ export default async function CustomerQuotePage({
           </div>
         </header>
 
-        {q.bannerImage && /^https?:\/\//i.test(q.bannerImage) && (
+        {q.bannerImage && /^(https?:\/\/|data:image\/(?:jpeg|png|webp);base64,)/i.test(q.bannerImage) && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={q.bannerImage} alt="Project" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 14, marginTop: 18 }} />
         )}
