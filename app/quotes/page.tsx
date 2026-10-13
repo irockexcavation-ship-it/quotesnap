@@ -164,7 +164,7 @@ export default function QuotesPage() {
     projectTotal: quote.project_total || "",
     startWindow: quote.start_window || "",
     scopeOfWork: quote.scope_of_work || "",
-    bannerImage: quote.banner_image || "",
+    bannerImage: quote.banner_image_url || quote.banner_image || "",
     status: quote.status || "Draft",
     archivedAt: quote.archived_at || "",
     completedAt: quote.completed_at || "",
