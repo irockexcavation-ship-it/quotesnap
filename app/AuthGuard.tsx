@@ -11,31 +11,34 @@ export default function AuthGuard({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [checking, setChecking] = useState(true);
+  const [checkedPath, setCheckedPath] = useState<string | null>(null);
+  const isPublicRoute = pathname === "/login" || pathname.startsWith("/q/");
 
   useEffect(() => {
+    if (pathname.startsWith("/q/")) return;
+
     async function checkAuth() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
-      if (!session && pathname !== "/login") {
-        router.replace("/login");
-        return;
-      }
 
       if (session && pathname === "/login") {
         router.replace("/");
         return;
       }
 
-      setChecking(false);
+      if (!session && pathname !== "/login") {
+        router.replace("/login");
+        return;
+      }
+
+      setCheckedPath(pathname);
     }
 
     checkAuth();
-  }, [pathname, router]);
+  }, [pathname, router, isPublicRoute]);
 
-  if (checking && pathname !== "/login") {
+  if (!isPublicRoute && checkedPath !== pathname) {
     return (
       <div
         style={{
