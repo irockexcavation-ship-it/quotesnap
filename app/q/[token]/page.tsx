@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import CustomerApprovalForm from "./CustomerApprovalForm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,7 +62,7 @@ export default async function CustomerQuotePage({
   const hash = createHash("sha256").update(token).digest("hex");
   const { data: link, error } = await admin
     .from("quote_share_links")
-    .select("id, workspace_id, quote_snapshot, revoked_at, expires_at")
+    .select("id, workspace_id, quote_snapshot, revoked_at, expires_at, accepted_at, accepted_name")
     .eq("token_hash", hash)
     .maybeSingle();
 
@@ -166,8 +167,9 @@ export default async function CustomerQuotePage({
 
         <section style={section}>
           <h2 style={{ marginTop: 0 }}>Ready to move forward?</h2>
-          <p style={{ lineHeight: 1.7 }}>To approve this quote or ask a question, contact iRock Excavation &amp; Hauling. Online acceptance is coming soon.</p>
-          <a href={`tel:${companyPhone.replace(/[^\d+]/g, "")}`} style={{ display: "inline-block", background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call iRock</a>
+          <p style={{ lineHeight: 1.7 }}>Review the scope, price, and terms above. You can approve this quote securely below or call iRock with questions.</p>
+          <CustomerApprovalForm token={token} alreadyApproved={Boolean(link.accepted_at)} approvedName={link.accepted_name} />
+          <a href={`tel:${companyPhone.replace(/[^\d+]/g, "")}`} style={{ display: "inline-block", marginTop: 16, background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call iRock</a>
         </section>
         <footer style={{ textAlign: "center", marginTop: 24, fontSize: 12, color: "#78716c" }}>
           Proposal issued by {companyName}
