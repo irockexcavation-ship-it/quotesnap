@@ -4,6 +4,26 @@ import { createHash } from "node:crypto";
 
 export const runtime = "nodejs";
 
+const NOTIFICATION_EMAIL = "irockexcavation@gmail.com";
+const SENDER_EMAIL = "QuoteSnap <notifications@irockx.com>";
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    };
+    return entities[character];
+  });
+}
+
+function formatAmount(value: unknown): string {
+  if (typeof value !== "number" && typeof value !== "string") return "Not specified";
+  const number = Number(String(value).replace(/[$,]/g, ""));
+  return Number.isFinite(number)
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(number)
+    : String(value);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,8 +48,7 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // The database function atomically freezes the accepted quote and refuses
-    // duplicate, expired, or revoked approvals. Never expose the server key.
+    // Keep the existing atomic database approval workflow unchanged.
     const { data: accepted, error } = await admin.rpc("accept_customer_quote", {
       p_token_hash: tokenHash,
       p_customer_name: name.trim(),
@@ -44,6 +63,79 @@ export async function POST(request: NextRequest) {
         { error: "This quote link is unavailable or has already been approved. Contact iRock for help." },
         { status: 409 },
       );
+    }
+
+    // Approval is already committed. Email is best-effort and must never undo it.
+    try {
+      const resendKey = process.env.RESEND_API_KEY;
+      if (!resendKey) {
+        console.warn("Quote approval email skipped: RESEND_API_KEY is not configured.");
+      } else {
+        const { data: link, error: linkError } = await admin
+          .from("quote_share_links")
+          .select("id, quote_id, accepted_name, accepted_at, accepted_quote_snapshot")
+          .eq("token_hash", tokenHash)
+          .single();
+
+        if (linkError || !link) {
+          console.error("Quote approval email: could not load accepted quote:", linkError);
+        } else {
+          const snapshot = (link.accepted_quote_snapshot ?? {}) as Record<string, unknown>;
+          const quoteNumber = String(snapshot.quoteNumber ?? "Quote");
+          const clientName = String(snapshot.clientName ?? "Customer");
+          const amount = formatAmount(snapshot.projectTotal);
+          const approvedBy = String(link.accepted_name ?? name.trim());
+          const approvedAt = link.accepted_at
+            ? new Date(link.accepted_at).toLocaleString("en-US", { timeZone: "America/New_York" }) + " Eastern"
+            : "Just now";
+          const jobsUrl = "https://quotesnap-six.vercel.app/current-jobs";
+          const subject = `Quote Approved: ${quoteNumber} - ${clientName}`;
+          const plainText = [
+            "A customer has approved a QuoteSnap quote.",
+            `Quote: ${quoteNumber}`,
+            `Customer: ${clientName}`,
+            `Approved by: ${approvedBy}`,
+            `Approved amount: ${amount}`,
+            `Approved at: ${approvedAt}`,
+            "Status: Approved - added to Current Jobs",
+            `View Current Jobs: ${jobsUrl}`,
+          ].join("\n");
+          const html = `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033;max-width:560px">
+            <h2 style="margin-bottom:8px">iRock | Quote Approved</h2>
+            <p>A customer approved a QuoteSnap quote.</p>
+            <p><strong>Quote:</strong> ${escapeHtml(quoteNumber)}<br>
+            <strong>Customer:</strong> ${escapeHtml(clientName)}<br>
+            <strong>Approved by:</strong> ${escapeHtml(approvedBy)}<br>
+            <strong>Approved amount:</strong> ${escapeHtml(amount)}<br>
+            <strong>Approved at:</strong> ${escapeHtml(approvedAt)}<br>
+            <strong>Status:</strong> Approved, added to Current Jobs</p>
+            <p><a href="${jobsUrl}">Open Current Jobs in QuoteSnap</a></p>
+          </div>`;
+
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${resendKey}`,
+              "Content-Type": "application/json",
+              "Idempotency-Key": `quotesnap-approval-${link.id}`,
+            },
+            body: JSON.stringify({
+              from: SENDER_EMAIL,
+              to: [NOTIFICATION_EMAIL],
+              subject,
+              text: plainText,
+              html,
+            }),
+            signal: AbortSignal.timeout(6000),
+          });
+
+          if (!response.ok) {
+            console.error("Quote approval email failed. Resend status:", response.status);
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error("Quote approval recorded, but email notification failed:", notificationError);
     }
 
     return NextResponse.json(
