@@ -27,6 +27,7 @@ type QuoteItem = {
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
   const [search, setSearch] = useState("");
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   useEffect(() => {
     migrateLegacyQuotesIfNeeded();
@@ -196,6 +197,42 @@ export default function QuotesPage() {
   function openQuote(quote: QuoteItem) {
     localStorage.setItem("quotesnapDraft", JSON.stringify(quote));
     window.location.href = "/preview";
+  }
+
+  async function shareQuote(quote: QuoteItem) {
+    if (sharingId) return;
+    setSharingId(quote.id);
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        alert("Please sign in to QuoteSnap again before sharing a quote.");
+        return;
+      }
+      const response = await fetch("/api/quotes/share", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ quoteId: quote.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || typeof result.link !== "string") {
+        throw new Error(result.error || "Unable to generate a customer link.");
+      }
+      try {
+        await navigator.clipboard.writeText(result.link);
+        alert(`Customer link copied!\n\n${result.link}\n\nPaste it into your text message.`);
+      } catch {
+        window.prompt("Copy this customer quote link:", result.link);
+      }
+    } catch (error) {
+      console.error("Customer quote link failed:", error);
+      alert(error instanceof Error ? error.message : "Unable to generate a customer link.");
+    } finally {
+      setSharingId(null);
+    }
   }
 
   function duplicateQuote(quote: QuoteItem) {
@@ -403,6 +440,14 @@ if (status === "Sent" && updatedQuote) {
                     <div style={buttonRow}>
                       <button onClick={() => openQuote(quote)} style={btnDark}>
                         Open
+                      </button>
+
+                      <button
+                        onClick={() => shareQuote(quote)}
+                        disabled={sharingId !== null}
+                        style={{ ...btnGreen, opacity: sharingId !== null ? 0.65 : 1 }}
+                      >
+                        {sharingId === quote.id ? "Creating Link..." : "Share Quote Link"}
                       </button>
 
                       <button
