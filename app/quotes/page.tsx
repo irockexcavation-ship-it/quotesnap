@@ -28,6 +28,7 @@ export default function QuotesPage() {
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
   const [search, setSearch] = useState("");
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [emailingId, setEmailingId] = useState<string | null>(null);
 
   useEffect(() => {
     migrateLegacyQuotesIfNeeded();
@@ -232,6 +233,53 @@ export default function QuotesPage() {
       alert(error instanceof Error ? error.message : "Unable to generate a customer link.");
     } finally {
       setSharingId(null);
+    }
+  }
+
+  async function emailQuote(quote: QuoteItem) {
+    if (sharingId || emailingId) return;
+    const recipient = window.prompt(
+      `Email quote ${quote.quoteNumber || ""} to which address?`,
+      ""
+    );
+    if (recipient === null) return;
+    const email = recipient.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
+    setEmailingId(quote.id);
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        alert("Please sign in to QuoteSnap again before emailing a quote.");
+        return;
+      }
+
+      const response = await fetch("/api/quotes/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ quoteId: quote.id, email }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to email this quote.");
+      }
+
+      alert(`Quote emailed to ${email}.`);
+      if (quote.status !== "Sent") {
+        await updateStatus(quote, "Sent");
+      }
+    } catch (error) {
+      console.error("Email quote failed:", error);
+      alert(error instanceof Error ? error.message : "Unable to email this quote.");
+    } finally {
+      setEmailingId(null);
     }
   }
 
@@ -448,6 +496,14 @@ if (status === "Sent" && updatedQuote) {
                         style={{ ...btnGreen, opacity: sharingId !== null ? 0.65 : 1 }}
                       >
                         {sharingId === quote.id ? "Creating Link..." : "Share Quote Link"}
+                      </button>
+
+                      <button
+                        onClick={() => emailQuote(quote)}
+                        disabled={sharingId !== null || emailingId !== null}
+                        style={{ ...btnGreen, opacity: sharingId !== null || emailingId !== null ? 0.65 : 1 }}
+                      >
+                        {emailingId === quote.id ? "Sending Email..." : "Email Quote"}
                       </button>
 
                       <button
