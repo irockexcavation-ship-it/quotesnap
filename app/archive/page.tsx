@@ -175,8 +175,7 @@ export default function ArchivePage() {
   }
 
   function protectedRecord(quote: QuoteItem) {
-    return quote.paymentStatus === "Paid" || !!quote.completedAt || !!quote.approvedAt ||
-      quote.archiveReason === "Completed job";
+    return quote.paymentStatus === "Paid";
   }
 
   async function hasRelatedRecords(quoteId: string): Promise<boolean> {
@@ -196,13 +195,13 @@ export default function ArchivePage() {
   async function permanentlyDelete(quote: QuoteItem) {
     if (busy) return;
     if (protectedRecord(quote)) {
-      window.alert("Completed or paid job records are protected from permanent deletion.");
+      window.alert("Paid records are protected from permanent deletion.");
       return;
     }
     if (!window.confirm(`PERMANENTLY delete ${quote.clientName || "this quote"}? This cannot be undone.`)) return;
     setBusy(true);
     if (await hasRelatedRecords(quote.id)) {
-      window.alert("This quote may have linked records or could not be safely verified. It will stay in Trash.");
+      window.alert("This quote has related records, or access to them could not be verified. It will stay in Trash. Do not mark it Paid to bypass this protection.");
       setBusy(false);
       return;
     }
@@ -223,10 +222,10 @@ export default function ArchivePage() {
     const eligible = trash.filter(q => !protectedRecord(q));
     const protectedCount = trash.length - eligible.length;
     if (!eligible.length) {
-      window.alert("No eligible quotes to permanently delete. Completed and paid records are protected.");
+      window.alert("No eligible quotes to permanently delete. Paid records are protected.");
       return;
     }
-    if (!window.confirm(`Permanently delete ${eligible.length} trashed quote(s)? ${protectedCount} completed/paid record(s) will be kept. This cannot be undone. Quotes with linked records may also be kept.`)) return;
+    if (!window.confirm(`Permanently delete ${eligible.length} trashed quote(s)? ${protectedCount} paid record(s) will be kept. This cannot be undone. Quotes with linked records may also be kept.`)) return;
     setBusy(true);
     let deleted = 0;
     let kept = 0;
@@ -317,7 +316,7 @@ export default function ArchivePage() {
             {tab === "trash" && <button style={btnDelete} disabled={busy || !trashCount} onClick={() => void emptyTrash()}>Empty Trash</button>}
           </div>
           {errorMessage && <p role="alert" style={{ color: "#b91c1c" }}>{errorMessage}</p>}
-          {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete eligible records. Approved, completed, and paid jobs are protected.</p>}
+          {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete eligible records. Paid records and quotes with linked data are protected.</p>}
 
           <input
             placeholder="Search archive"
@@ -404,7 +403,7 @@ export default function ArchivePage() {
                       {tab === "trash" ? (
                         <>
                           <button disabled={busy} onClick={() => void restoreFromTrash(quote)} style={btnGreen}>Restore</button>
-                          <button disabled={busy || protectedRecord(quote)} onClick={() => void permanentlyDelete(quote)} style={{ ...btnDelete, opacity: protectedRecord(quote) ? 0.5 : 1 }} title={protectedRecord(quote) ? "Completed/paid records are protected" : "Permanently delete"}>Delete Forever</button>
+                          <button disabled={busy || protectedRecord(quote)} onClick={() => void permanentlyDelete(quote)} style={{ ...btnDelete, opacity: protectedRecord(quote) ? 0.5 : 1 }} title={protectedRecord(quote) ? "Paid records are protected" : "Permanently delete"}>Delete Forever</button>
                         </>
                       ) : (
                         <>
