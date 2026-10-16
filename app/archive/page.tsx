@@ -35,6 +35,8 @@ type QuoteItem = {
 
 export default function ArchivePage() {
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
+  const [archivedInvoices, setArchivedInvoices] = useState<any[]>([]);
+  const [invoiceError, setInvoiceError] = useState("");
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"completed" | "invoices" | "inactive" | "trash">("completed");
   const [busy, setBusy] = useState(false);
@@ -42,7 +44,25 @@ export default function ArchivePage() {
 
   useEffect(() => {
     void loadArchivedQuotes();
+    void loadArchivedInvoices();
   }, []);
+
+  async function loadArchivedInvoices() {
+    const { data, error } = await supabase.from("invoices")
+      .select("id,invoice_number,client_name,project_address,total,amount_paid,status,invoice_date,archived_at")
+      .not("archived_at", "is", null)
+      .order("archived_at", { ascending: false });
+    if (error) { setInvoiceError(error.message); return; }
+    setInvoiceError("");
+    setArchivedInvoices(data || []);
+  }
+
+  async function restoreInvoice(id: string) {
+    if (!window.confirm("Restore this invoice to the working invoice list?")) return;
+    const { error } = await supabase.from("invoices").update({ archived_at: null }).eq("id", id);
+    if (error) { setInvoiceError(error.message); return; }
+    await loadArchivedInvoices();
+  }
 
   async function loadArchivedQuotes() {
     const { data, error } = await supabase
@@ -322,7 +342,7 @@ export default function ArchivePage() {
               <span style={tileTop}><span style={tileIcon}>$</span><span style={{ ...statusLight, background: tab === "invoices" ? "#64748b" : "#d6d3d1" }} /></span>
               <span style={tileTitle}>Invoices</span>
               <span style={tileDescription}>Historical invoices and payments</span>
-              <span style={tileCount}>Connection coming next</span>
+              <span style={tileCount}>{archivedInvoices.length} records</span>
             </button>
             <button type="button" onClick={() => { setTab("inactive"); setSearch(""); setErrorMessage(""); }}
               style={{ ...tile, ...(tab === "inactive" ? selectedTile : {}) }} aria-pressed={tab === "inactive"}>
@@ -349,7 +369,30 @@ export default function ArchivePage() {
           {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete them. You decide what goes. Database relationships may still prevent deletion until linked records can be cleaned up.</p>}
 
           {tab === "invoices" ? (
-            <div style={emptyBox}>Invoice history will appear here when we connect the existing invoice records. No invoices have been moved or deleted.</div>
+            <div style={{ display: "grid", gap: "12px" }}>
+              {invoiceError && <p role="alert" style={{ color: "#b91c1c" }}>{invoiceError}</p>}
+              {!archivedInvoices.length && <div style={emptyBox}>No archived invoices yet. Move invoices here manually from the Invoices page.</div>}
+              {archivedInvoices.map((invoice) => {
+                const total = Number(invoice.total || 0);
+                const paid = Number(invoice.amount_paid || 0);
+                const dollars = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+                return <div key={invoice.id} style={quoteCard}>
+                  <div style={rowTop}>
+                    <div>
+                      <div style={clientName}>{invoice.client_name || "Unnamed Client"}</div>
+                      <div style={meta}>{invoice.invoice_number || "Invoice"} · {invoice.invoice_date || "No date"}</div>
+                      <div style={address}>{invoice.project_address || ""}</div>
+                      <div style={meta}>Total {dollars(total)} · Paid {dollars(paid)} · Balance {dollars(Math.max(total - paid, 0))}</div>
+                    </div>
+                    <span style={paid >= total ? paidBadge : unpaidBadge}>{paid >= total ? "Paid" : "Unpaid"}</span>
+                  </div>
+                  <div style={buttonRow}>
+                    <button style={btnGreen} onClick={() => window.location.href = `/invoices?id=${invoice.id}`}>Open Invoice / PDF</button>
+                    <button style={navBtn} onClick={() => void restoreInvoice(invoice.id)}>Restore</button>
+                  </div>
+                </div>;
+              })}
+            </div>
           ) : (<>
           <input
             placeholder="Search this section"
