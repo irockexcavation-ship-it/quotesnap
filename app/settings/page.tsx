@@ -58,6 +58,12 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoMessage, setLogoMessage] = useState("");
   const [logoError, setLogoError] = useState("");
+  const [coiPath, setCoiPath] = useState("");
+  const [coiExpiry, setCoiExpiry] = useState("");
+  const [coiFile, setCoiFile] = useState<File | null>(null);
+  const [coiBusy, setCoiBusy] = useState(false);
+  const [coiMessage, setCoiMessage] = useState("");
+  const [coiError, setCoiError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -84,7 +90,7 @@ export default function SettingsPage() {
 
         const { data: workspace, error: workspaceError } = await supabase
           .from("workspaces")
-          .select("id, name, business_name, contact_name, phone, email, address, website, tagline, logo_path")
+          .select("id, name, business_name, contact_name, phone, email, address, website, tagline, logo_path, coi_path, coi_expires_on")
           .eq("id", membership.workspace_id)
           .single();
         if (!active) return;
@@ -99,6 +105,8 @@ export default function SettingsPage() {
           tagline: workspace.tagline ?? "",
           logo_path: workspace.logo_path ?? "",
         };
+        setCoiPath(workspace.coi_path ?? "");
+        setCoiExpiry(workspace.coi_expires_on ?? "");
         setWorkspaceId(workspace.id);
         setCanEdit(membership.role === "owner");
         setProfile(loaded);
@@ -197,6 +205,81 @@ export default function SettingsPage() {
     }
   }
 
+  async function uploadCoi() {
+    if (!workspaceId || !canEdit || coiBusy || !coiFile) return;
+    setCoiError(""); setCoiMessage("");
+    if (coiFile.type !== "application/pdf" || !coiFile.name.toLowerCase().endsWith(".pdf")) {
+      setCoiError("Choose a PDF certificate."); return;
+    }
+    if (coiFile.size > 10 * 1024 * 1024) {
+      setCoiError("Certificate must be 10 MB or smaller."); return;
+    }
+    if (!coiExpiry) { setCoiError("Enter the certificate expiration date."); return; }
+    if (coiExpiry < `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`) {
+      setCoiError("The expiration date has passed. Upload a current certificate."); return;
+    }
+    setCoiBusy(true);
+    const path = `${workspaceId}/coi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}.pdf`;
+    try {
+      const { error: uploadError } = await supabase.storage.from("business-coi").upload(path, coiFile, {
+        contentType: "application/pdf", upsert: false,
+      });
+      if (uploadError) throw new Error(`Certificate upload failed: ${uploadError.message}`);
+      const { data, error: saveError } = await supabase.from("workspaces")
+        .update({ coi_path: path, coi_expires_on: coiExpiry })
+        .eq("id", workspaceId).select("id").single();
+      if (saveError || !data) {
+        await supabase.storage.from("business-coi").remove([path]);
+        throw new Error(`Certificate uploaded but could not be saved: ${saveError?.message ?? "Workspace not updated"}`);
+      }
+      const oldPath = coiPath;
+      setCoiPath(path); setCoiFile(null);
+      setCoiMessage("Certificate saved. Future quote PDFs can use this certificate once Preview is connected.");
+      if (oldPath && oldPath !== path && oldPath.startsWith(`${workspaceId}/`)) {
+        void supabase.storage.from("business-coi").remove([oldPath]);
+      }
+    } catch (err) {
+      setCoiError(err instanceof Error ? err.message : "Could not upload certificate.");
+    } finally { setCoiBusy(false); }
+  }
+
+  async function viewCoi() {
+    if (!coiPath) return;
+    setCoiError("");
+    const { data, error: viewError } = await supabase.storage.from("business-coi")
+      .createSignedUrl(coiPath, 60);
+    if (viewError || !data?.signedUrl) {
+      setCoiError(`Could not open certificate: ${viewError?.message ?? "No link returned"}`);
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function removeCoi() {
+    if (!workspaceId || !canEdit || !coiPath || coiBusy) return;
+    if (!window.confirm("Remove the current certificate from QuoteSnap?")) return;
+    setCoiBusy(true); setCoiError(""); setCoiMessage("");
+    try {
+      const { data, error: updateError } = await supabase.from("workspaces")
+        .update({ coi_path: null, coi_expires_on: null })
+        .eq("id", workspaceId).select("id").single();
+      if (updateError || !data) throw new Error(updateError?.message ?? "Workspace not updated");
+      const oldPath = coiPath;
+      setCoiPath(""); setCoiExpiry(""); setCoiFile(null);
+      setCoiMessage("Certificate removed from your business settings.");
+      if (oldPath.startsWith(`${workspaceId}/`)) {
+        const { error: deleteError } = await supabase.storage.from("business-coi").remove([oldPath]);
+        if (deleteError) setCoiError("Settings updated, but the old stored file could not be deleted. Contact your administrator.");
+      }
+    } catch (err) {
+      setCoiError(err instanceof Error ? err.message : "Could not remove certificate.");
+    } finally { setCoiBusy(false); }
+  }
+
+  const coiDaysLeft = coiExpiry
+    ? Math.ceil((new Date(`${coiExpiry}T23:59:59`).getTime() - Date.now()) / 86400000)
+    : null;
+
   const logoUrl = profile.logo_path
     ? supabase.storage.from("business-logos").getPublicUrl(profile.logo_path).data.publicUrl
     : "";
@@ -231,6 +314,10 @@ export default function SettingsPage() {
     display: "block", width: "100%", boxSizing: "border-box", border: "1px solid #d1d5db",
     borderRadius: 9, padding: "12px", fontSize: 15, color: "#111827", background: "#fff",
   };
+  const buttonStyle: React.CSSProperties = {
+    border: "none", borderRadius: 9, padding: "11px 14px", color: "white", fontWeight: 700, cursor: "pointer",
+  };
+
   const dirty = JSON.stringify(profile) !== JSON.stringify(original);
 
   return (
@@ -307,6 +394,43 @@ export default function SettingsPage() {
               </button>
             </form>
           ) : <p role="alert" style={{ color: "#991b1b", background: "#fee2e2", padding: 12, borderRadius: 8 }}>{profileError || "Business profile unavailable."}</p>}
+        </section>
+
+        <section style={{ ...panel, marginBottom: 16 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 19 }}>Certificate of Insurance</h2>
+          <p style={{ color: "#6b7280", fontSize: 13, lineHeight: 1.6 }}>
+            Keep your current COI in private business storage. You can replace it each renewal without redeploying QuoteSnap.
+          </p>
+          {!workspaceId || profileLoading ? <p>Loading workspace...</p> : <>
+            <div style={{ padding: 14, borderRadius: 10, background: "#f9fafb", border: "1px solid #e5e7eb", marginBottom: 16 }}>
+              <strong>{coiPath ? "Certificate on file" : "No certificate on file"}</strong>
+              {coiPath && <p style={{ margin: "8px 0 0", fontSize: 13, color: coiDaysLeft !== null && coiDaysLeft <= 30 ? "#b91c1c" : "#57534e" }}>
+                Expires: {coiExpiry || "Not set"}
+                {coiDaysLeft !== null && (coiDaysLeft < 0 ? " · EXPIRED" : coiDaysLeft <= 30 ? ` · ${coiDaysLeft} day(s) remaining` : "")}
+              </p>}
+              {coiPath && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                <button type="button" onClick={() => void viewCoi()} style={{ ...buttonStyle, background: "#1c1917" }}>View Current PDF</button>
+                <button type="button" onClick={() => void removeCoi()} disabled={!canEdit || coiBusy} style={{ ...buttonStyle, background: "#b91c1c", opacity: !canEdit || coiBusy ? 0.5 : 1 }}>Remove COI</button>
+              </div>}
+            </div>
+            {!canEdit && <p style={{ color: "#92400e" }}>Only the workspace owner can change the certificate.</p>}
+            <label htmlFor="coi-expiry" style={{ ...label, display: "block" }}>Certificate expiration date</label>
+            <input id="coi-expiry" type="date" value={coiExpiry} disabled={!canEdit || coiBusy}
+              onChange={(event) => { setCoiExpiry(event.target.value); setCoiMessage(""); }}
+              style={{ ...inputStyle, marginBottom: 14 }} />
+            <label htmlFor="coi-file" style={{ ...label, display: "block" }}>{coiPath ? "Replacement certificate PDF" : "Certificate PDF"}</label>
+            <input id="coi-file" type="file" accept="application/pdf,.pdf" disabled={!canEdit || coiBusy}
+              onChange={(event) => { setCoiFile(event.target.files?.[0] ?? null); setCoiMessage(""); }}
+              style={{ ...inputStyle, marginBottom: 12 }} />
+            <p style={{ fontSize: 12, color: "#6b7280" }}>PDF only, up to 10 MB. Choose a file and its expiration date, then save. Changing the date alone does not update the stored certificate.</p>
+            <button type="button" disabled={!canEdit || coiBusy || !coiFile || !coiExpiry}
+              onClick={() => void uploadCoi()} style={{ ...buttonStyle, background: "#ea580c", opacity: !canEdit || coiBusy || !coiFile || !coiExpiry ? 0.5 : 1 }}>
+              {coiBusy ? "Working..." : coiPath ? "Replace Certificate" : "Upload Certificate"}
+            </button>
+            {coiError && <p role="alert" style={{ color: "#991b1b" }}>{coiError}</p>}
+            {coiMessage && <p role="status" style={{ color: "#166534" }}>{coiMessage}</p>}
+            <p style={{ color: "#6b7280", fontSize: 12, marginBottom: 0 }}>PDF attachment will be enabled in the Preview page after this Settings feature is tested.</p>
+          </>}
         </section>
 
         <section style={panel}>
