@@ -31,6 +31,7 @@ export default function QuotesPage() {
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [emailingId, setEmailingId] = useState<string | null>(null);
   const [trashingId, setTrashingId] = useState<string | null>(null);
+  const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     migrateLegacyQuotesIfNeeded();
@@ -498,69 +499,37 @@ if (status === "Sent" && updatedQuote) {
                     </div>
 
                     <div style={buttonRow}>
-                      <button onClick={() => openQuote(quote)} style={btnDark}>
-                        Open
-                      </button>
-
-                      <button
-                        onClick={() => shareQuote(quote)}
-                        disabled={sharingId !== null}
-                        style={{ ...btnGreen, opacity: sharingId !== null ? 0.65 : 1 }}
-                      >
+                      <button type="button" onClick={() => openQuote(quote)} style={btnDark}>Open Quote</button>
+                      <button type="button" onClick={() => shareQuote(quote)} disabled={sharingId !== null}
+                        style={{ ...btnGreen, opacity: sharingId !== null ? 0.65 : 1 }}>
                         {sharingId === quote.id ? "Creating Link..." : "Share Quote Link"}
                       </button>
-
-                      <button
-                        onClick={() => emailQuote(quote)}
-                        disabled={sharingId !== null || emailingId !== null}
-                        style={{ ...btnGreen, opacity: sharingId !== null || emailingId !== null ? 0.65 : 1 }}
-                      >
+                      <button type="button" onClick={() => emailQuote(quote)} disabled={sharingId !== null || emailingId !== null}
+                        style={{ ...btnGreen, opacity: sharingId !== null || emailingId !== null ? 0.65 : 1 }}>
                         {emailingId === quote.id ? "Sending Email..." : "Email Quote"}
                       </button>
-
-                      <button
-                        onClick={() => duplicateQuote(quote)}
-                        style={btnOrange}
-                      >
-                        Duplicate
-                      </button>
-
-                      <button
-                        onClick={() => updateStatus(quote, "Draft")}
-                        style={btnLight}
-                      >
-                        Draft
-                      </button>
-
-                      <button
-                        onClick={() => updateStatus(quote, "Sent")}
-                        style={btnLight}
-                      >
-                        Sent
-                      </button>
-
-                      <button
-                        onClick={() => updateStatus(quote, "Approved")}
-                        style={btnGreen}
-                      >
-                        Approved
-                      </button>
-
-                      <button
-                        onClick={() => updateStatus(quote, "Archived")}
-                        style={btnGray}
-                      >
-                        Archive
-                      </button>
-
-                      <button
-                        onClick={() => deleteQuote(quote)}
-                        disabled={trashingId !== null}
-                        style={{ ...btnDelete, opacity: trashingId !== null ? 0.65 : 1 }}
-                      >
-                        {trashingId === quote.id ? "Moving..." : "Trash"}
+                      <button type="button" onClick={() => setExpandedQuoteId(expandedQuoteId === quote.id ? null : quote.id)}
+                        style={btnMore} aria-expanded={expandedQuoteId === quote.id}
+                        aria-controls={`quote-actions-${quote.id}`}>
+                        {expandedQuoteId === quote.id ? "Fewer Actions ▲" : "More Actions ▼"}
                       </button>
                     </div>
+                    {expandedQuoteId === quote.id && (
+                      <div id={`quote-actions-${quote.id}`} style={moreActionsPanel}>
+                        <div style={moreActionsTitle}>QUOTE MANAGEMENT</div>
+                        <div style={buttonRow}>
+                          <button type="button" onClick={() => duplicateQuote(quote)} style={btnOrange}>Duplicate</button>
+                          <button type="button" onClick={() => void updateStatus(quote, "Draft")} style={btnLight}>Mark Draft</button>
+                          <button type="button" onClick={() => void updateStatus(quote, "Sent")} style={btnLight}>Mark Sent</button>
+                          <button type="button" onClick={() => void updateStatus(quote, "Approved")} style={btnGreen}>Mark Approved</button>
+                          <button type="button" onClick={() => void updateStatus(quote, "Archived")} style={btnGray}>Archive</button>
+                          <button type="button" onClick={() => void deleteQuote(quote)} disabled={trashingId !== null}
+                            style={{ ...btnDelete, opacity: trashingId !== null ? 0.65 : 1 }}>
+                            {trashingId === quote.id ? "Moving..." : "Move to Trash"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -718,4 +687,30 @@ const btnDelete = {
   borderRadius: "10px",
   padding: "8px 12px",
   cursor: "pointer",
+};
+
+const btnMore = {
+  background: "#fafaf9",
+  color: "#44403c",
+  border: "1px solid #d6d3d1",
+  borderRadius: "10px",
+  padding: "8px 12px",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const moreActionsPanel = {
+  marginTop: "12px",
+  padding: "14px",
+  border: "1px solid #e7e5e4",
+  background: "#fafaf9",
+  borderRadius: "12px",
+};
+
+const moreActionsTitle = {
+  color: "#78716c",
+  fontSize: "11px",
+  fontWeight: 800,
+  letterSpacing: "0.06em",
+  marginBottom: "10px",
 };
