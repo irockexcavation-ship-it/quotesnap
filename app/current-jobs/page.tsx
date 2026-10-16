@@ -37,6 +37,7 @@ export default function CurrentJobsPage() {
   const [jobs, setJobs] = useState<QuoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [moreActionsId, setMoreActionsId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadJobs();
@@ -516,60 +517,37 @@ async function scheduleJob(job: QuoteItem) {
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openJob(job)}
-                      style={smallButton("#1c1917", "#ffffff")}
-                    >
-                      Open
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => returnToQuotes(job)}
-                      style={smallButton("#f97316", "#ffffff")}
-                    >
-                      Return to Quotes
-                    </button>
-
-                    {job.paymentStatus === "Paid" ? (
+                  <div style={{ borderTop: "1px solid #e7e5e4", paddingTop: "14px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+                      <button type="button" onClick={() => openJob(job)} style={smallButton("#1c1917", "#ffffff")}>Open Job</button>
+                      <button type="button" onClick={() => scheduleJob(job)} style={smallButton("#f97316", "#ffffff")}>
+                        {job.scheduledDate ? "Change Date" : "Schedule Job"}
+                      </button>
+                      <button type="button" onClick={() => completeJob(job)} style={smallButton("#15803d", "#ffffff")}>Job Completed</button>
                       <button
                         type="button"
-                        onClick={() => markUnpaid(job)}
-                        style={smallButton("#fee2e2", "#991b1b", "#fecaca")}
+                        onClick={() => setMoreActionsId(moreActionsId === job.id ? null : job.id)}
+                        aria-expanded={moreActionsId === job.id}
+                        style={smallButton("#f5f5f4", "#44403c", "#d6d3d1")}
                       >
-                        Mark Unpaid
+                        {moreActionsId === job.id ? "Less Actions ▲" : "More Actions ▼"}
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => markPaid(job)}
-                        style={smallButton("#dcfce7", "#166534", "#86efac")}
-                      >
-                        Mark Paid
-                      </button>
+                    </div>
+                    {moreActionsId === job.id && (
+                      <div style={{ marginTop: "12px", padding: "12px", background: "#fafaf9", border: "1px solid #e7e5e4", borderRadius: "12px" }}>
+                        <div style={{ fontSize: "12px", color: "#57534e", marginBottom: "10px" }}>
+                          Administrative actions. Payment status here is a quote label only; record actual payments on the invoice.
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                          <button type="button" onClick={() => returnToQuotes(job)} style={smallButton("#fff7ed", "#9a3412", "#fdba74")}>Return to Quotes</button>
+                          {job.paymentStatus === "Paid" ? (
+                            <button type="button" onClick={() => markUnpaid(job)} style={smallButton("#fee2e2", "#991b1b", "#fecaca")}>Mark Unpaid</button>
+                          ) : (
+                            <button type="button" onClick={() => markPaid(job)} style={smallButton("#dcfce7", "#166534", "#86efac")}>Mark Paid</button>
+                          )}
+                        </div>
+                      </div>
                     )}
-<button
-  type="button"
-  onClick={() => scheduleJob(job)}
-  style={smallButton("#f97316", "#ffffff")}
->
-  Schedule Job
-</button>
-                    <button
-                      type="button"
-                      onClick={() => completeJob(job)}
-                      style={smallButton("#57534e", "#ffffff")}
-                    >
-                      Job Completed
-                    </button>
                   </div>
                 </div>
               ))}
