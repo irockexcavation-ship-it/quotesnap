@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { PDFDocument } from "pdf-lib";
 import irockLogo from "../irock-logo.png";
 
 type BusinessProfile = {
@@ -72,6 +70,7 @@ export default function PreviewPage() {
   const [business, setBusiness] = useState<BusinessProfile | null>(null);
   const [businessLoading, setBusinessLoading] = useState(true);
   const [businessError, setBusinessError] = useState("");
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
 
   const companyName = business?.business_name?.trim() || business?.name?.trim() || FALLBACK_COMPANY.name;
   const companyTagline = business?.tagline?.trim() || FALLBACK_COMPANY.tagline;
@@ -145,43 +144,6 @@ function buildBaseName() {
 function buildFileName() {
   return buildBaseName() + "_quote.pdf";
 }
-
-function buildImageFileName() {
-  return buildBaseName() + "_quote-image.png";
-}
-
-function buildPhotoFileName() {
-  return buildBaseName() + "_photo.jpg";
-}
-
-  async function saveQuoteImage() {
-    const element =
-      document.getElementById("quote-card");
-
-    if (!element) return;
-
-    const canvas = await html2canvas(
-      element,
-      {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      }
-    );
-
-    const image =
-      canvas.toDataURL("image/png");
-
-    const link =
-      document.createElement("a");
-
-    link.href = image;
-    link.download = buildImageFileName();
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
 
   async function exportPDF() {
     const pdf = new jsPDF({
@@ -622,118 +584,12 @@ function buildPhotoFileName() {
 
     addSection(
       "Next Steps",
-      `To move forward with this project, reply to this quote or contact ${companyName} directly. Once approved, your project will be placed on the schedule. A current Certificate of Insurance is attached at the end of this PDF for your records.`
+      `To move forward with this project, reply to this quote or contact ${companyName} directly. Once approved, your project will be placed on the schedule.`
     );
 
-    const quotePdfBytes =
-      pdf.output("arraybuffer");
-
-    const mergedPdf =
-      await PDFDocument.create();
-
-    const quoteDoc =
-      await PDFDocument.load(
-        quotePdfBytes
-      );
-
-    const quotePages =
-      await mergedPdf.copyPages(
-        quoteDoc,
-        quoteDoc.getPageIndices()
-      );
-
-    quotePages.forEach((page) =>
-      mergedPdf.addPage(page)
-    );
-
-    try {
-      const coiResponse =
-        await fetch("/coi.pdf");
-
-      if (coiResponse.ok) {
-        const coiBytes =
-          await coiResponse.arrayBuffer();
-
-        const coiDoc =
-          await PDFDocument.load(
-            coiBytes
-          );
-
-        const coiPages =
-          await mergedPdf.copyPages(
-            coiDoc,
-            coiDoc.getPageIndices()
-          );
-
-        coiPages.forEach((page) =>
-          mergedPdf.addPage(page)
-        );
-      }
-    } catch {
-      alert(
-        "COI could not be attached. The quote will still export."
-      );
-    }
-
-    const finalBytes =
-      await mergedPdf.save();
-
-    const finalBuffer =
-      finalBytes.buffer.slice(
-        finalBytes.byteOffset,
-        finalBytes.byteOffset +
-          finalBytes.byteLength
-      ) as ArrayBuffer;
-
-    const blob = new Blob(
-      [finalBuffer],
-      {
-        type: "application/pdf",
-      }
-    );
-
-    const url =
-      URL.createObjectURL(blob);
-
-    const link =
-      document.createElement("a");
-
-    link.href = url;
-    link.download =
-      buildFileName();
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
-  }
-
-  function savePhotoToDevice() {
-    if (!quote.bannerImage) {
-      alert(
-        "No photo is attached to this quote."
-      );
-
-      return;
-    }
-
-    const link =
-      document.createElement("a");
-
-    link.href =
-      quote.bannerImage;
-
-    link.download =
-      buildPhotoFileName();
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
+    // Export the quote itself. COI attachments will be managed through Settings
+    // once the workspace certificate upload feature is configured.
+    pdf.save(buildFileName());
   }
 
   function handleEdit() {
@@ -836,7 +692,7 @@ function buildPhotoFileName() {
     window.location.href = `/invoices?id=${data.id}`;
   }
   function goHome() {
-    window.location.href = "/";
+    window.location.href = "/dashboard";
   }
 
   return (
@@ -850,100 +706,28 @@ function buildPhotoFileName() {
           "Arial, sans-serif",
       }}
     >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin:
-            "0 auto 20px auto",
-          display: "flex",
-          gap: "10px",
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          onClick={goHome}
-          style={topButton(
-            "#ffffff",
-            "#1c1917",
-            "#d6d3d1"
-          )}
-        >
-          Home
-        </button>
+      <div style={{ maxWidth: "900px", margin: "0 auto 14px", display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button type="button" onClick={goHome} style={topButton("#ffffff", "#1c1917", "#d6d3d1")}>← Dashboard</button>
+        <button type="button" onClick={() => { window.location.href = "/quotes"; }} style={topButton("#ffffff", "#1c1917", "#d6d3d1")}>← Quotes</button>
+      </div>
 
-        <button
-          onClick={exportPDF}
-          disabled={businessLoading}
-          style={topButton(
-            "#f97316",
-            "#ffffff"
-          )}
-        >
-          {businessLoading ? "Loading Branding..." : "Export to PDF"}
-        </button>
-
-        <button
-          onClick={saveQuoteImage}
-          style={topButton(
-            "#1c1917",
-            "#ffffff"
-          )}
-        >
-          Save Quote Image
-        </button>
-
-        <button
-          onClick={savePhotoToDevice}
-          style={topButton(
-            "#57534e",
-            "#ffffff"
-          )}
-        >
-          Save Photo to Device
-        </button>
-
-        <button
-          onClick={sendQuoteText}
-          style={topButton(
-            "#15803d",
-            "#ffffff"
-          )}
-        >
-          Send Quote Text
-        </button>
-<button
-  onClick={createInvoice}
-  style={{
-    padding: "12px 16px",
-    background: "#15803d",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: 700,
-  }}
->
-  Create Invoice
-</button>
-        <button
-          onClick={handleEdit}
-          style={topButton(
-            "#d6d3d1",
-            "#1c1917"
-          )}
-        >
-          Edit Quote
-        </button>
-
-        <button
-          onClick={handleDuplicate}
-          style={topButton(
-            "#2563eb",
-            "#ffffff"
-          )}
-        >
-          Duplicate Quote
-        </button>
+      <div style={{ maxWidth: "900px", margin: "0 auto 20px", padding: "16px", border: "1px solid #e7e5e4", borderRadius: 16, background: "#fff" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={handleEdit} style={topButton("#1c1917", "#ffffff")}>Edit Quote</button>
+          <button type="button" onClick={exportPDF} disabled={businessLoading} style={{ ...topButton("#f97316", "#ffffff"), opacity: businessLoading ? 0.6 : 1 }}>
+            {businessLoading ? "Loading Branding..." : "Export to PDF"}
+          </button>
+          <button type="button" onClick={createInvoice} style={topButton("#15803d", "#ffffff")}>Create Invoice</button>
+          <button type="button" onClick={() => setMoreActionsOpen((open) => !open)} aria-expanded={moreActionsOpen} aria-controls="preview-more-actions" style={topButton("#f5f5f4", "#292524", "#d6d3d1")}>
+            More Actions {moreActionsOpen ? "▴" : "▾"}
+          </button>
+        </div>
+        {moreActionsOpen && (
+          <div id="preview-more-actions" style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #e7e5e4", display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button type="button" onClick={sendQuoteText} style={topButton("#15803d", "#ffffff")}>Prepare Quote Text</button>
+            <button type="button" onClick={handleDuplicate} style={topButton("#2563eb", "#ffffff")}>Duplicate Quote</button>
+          </div>
+        )}
       </div>
 
       {businessError && (
