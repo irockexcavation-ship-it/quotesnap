@@ -12,6 +12,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboard();
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") loadDashboard();
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    return () => window.removeEventListener("focus", refreshOnReturn);
   }, []);
 
   async function loadDashboard() {
@@ -60,9 +65,25 @@ setCurrentJobs(accepted);
 
       if (followUpError) {
         console.error("Dashboard follow-up load failed:", followUpError);
+        setFollowUps(0);
+        setDueFollowUps([]);
       } else {
-        setFollowUps(followUpData?.length || 0);
-          setDueFollowUps(followUpData || []);
+        // Only active, sent quotes can require a customer follow-up.
+        // Completed, dismissed, deleted, or archived reminders must not
+        // linger in the dashboard's Needs Attention panel.
+        const activeReminders = (followUpData || []).filter((followUp: any) => {
+          const quote = Array.isArray(followUp.quotes)
+            ? followUp.quotes[0]
+            : followUp.quotes;
+          return quote?.status === "Sent" && !quote?.trashed_at;
+        });
+        const now = Date.now();
+        const dueReminders = activeReminders.filter((followUp: any) => {
+          const due = new Date(followUp.due_at).getTime();
+          return Number.isFinite(due) && due <= now;
+        });
+        setFollowUps(activeReminders.length);
+        setDueFollowUps(dueReminders);
       }
     } catch (error) {
       console.error("Dashboard load failed:", error);
