@@ -8,6 +8,7 @@ export default function DashboardPage() {
   const [followUps, setFollowUps] = useState(0);
     const [dueFollowUps, setDueFollowUps] = useState<any[]>([]);
   const [acceptedValue, setAcceptedValue] = useState(0);
+  const [overduePayments, setOverduePayments] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ setCurrentJobs(accepted);
         }, 0);
 
         setAcceptedValue(total);
+        setOverduePayments(accepted.filter((quote) => String(quote.payment_status || "").toLowerCase() === "overdue").length);
       }
 
       const { data: followUpData, error: followUpError } = await supabase
@@ -239,6 +241,10 @@ setCurrentJobs(accepted);
             <div style={{ color: "#999", fontSize: "12px" }}>
               OPEN QUOTES
             </div>
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: "#aaa" }}>
+              <span style={{ width: 11, height: 11, flexShrink: 0, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(255,255,255,0.1)" }} />
+              Normal
+            </div>
           </div>
 
           <div onClick={() => goTo("/current-jobs")} style={gaugeStyle}>
@@ -246,6 +252,10 @@ setCurrentJobs(accepted);
             <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : acceptedJobs}</div>
             <div style={{ color: "#999", fontSize: "12px" }}>
               ACCEPTED JOBS
+            </div>
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: (overduePayments > 0) ? "#fca5a5" : "#86efac" }}>
+              <span style={{ width: 11, height: 11, flexShrink: 0, borderRadius: "50%", background: (overduePayments > 0) ? "#ef4444" : "#22c55e", boxShadow: "0 0 8px rgba(255,255,255,0.1)" }} />
+              {(overduePayments > 0) ? "Overdue payment" : "Normal"}
             </div>
           </div>
 
@@ -255,6 +265,11 @@ setCurrentJobs(accepted);
             <div style={{ color: "#999", fontSize: "12px" }}>
               FOLLOW-UPS
             </div>
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: (dueFollowUps.length > 0) ? "#fca5a5" : "#86efac" }}>
+              <span style={{ width: 11, height: 11, flexShrink: 0, borderRadius: "50%", background: (dueFollowUps.length > 0) ? "#ef4444" : "#22c55e", boxShadow: "0 0 8px rgba(255,255,255,0.1)" }} />
+              {(dueFollowUps.length > 0) ? "Due now" : "All caught up"}
+            </div>
+            {!loading && dueFollowUps.length > 0 && <div style={{ color: "#fca5a5", fontSize: "11px", marginTop: 5 }}>{dueFollowUps.length} reminder{dueFollowUps.length === 1 ? "" : "s"} need attention</div>}
           </div>
 
           <div onClick={() => goTo("/current-jobs")} style={gaugeStyle}>
@@ -265,87 +280,12 @@ setCurrentJobs(accepted);
             <div style={{ color: "#999", fontSize: "12px" }}>
               ACCEPTED VALUE
             </div>
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: (overduePayments > 0) ? "#fca5a5" : "#86efac" }}>
+              <span style={{ width: 11, height: 11, flexShrink: 0, borderRadius: "50%", background: (overduePayments > 0) ? "#ef4444" : "#22c55e", boxShadow: "0 0 8px rgba(255,255,255,0.1)" }} />
+              {(overduePayments > 0) ? "Payment overdue" : "Normal"}
+            </div>
           </div>
         </div>
-{/* NEEDS ATTENTION */}
-{dueFollowUps.length > 0 && (
-  <div
-    style={{
-      background: "#151515",
-      border: "1px solid #333",
-      borderRadius: "18px",
-      padding: "22px",
-      marginBottom: "20px",
-    }}
-  >
-    <div
-      style={{
-        fontSize: "13px",
-        color: "#f97316",
-        fontWeight: 800,
-        letterSpacing: "1px",
-        marginBottom: "16px",
-      }}
-    >
-      NEEDS ATTENTION
-    </div>
-
-    {dueFollowUps.map((followUp: any) => (
-      <div
-        key={followUp.id}
-        onClick={() => openQuotePreview(followUp.quotes)}
-        style={{
-          background: "#202020",
-          border: "1px solid #333",
-          borderRadius: "14px",
-          padding: "16px",
-          marginBottom: "10px",
-          cursor: "pointer",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "16px",
-            fontWeight: 800,
-            marginBottom: "5px",
-          }}
-        >
-          {followUp.quotes?.client_name || "Customer"}
-        </div>
-
-        <div
-          style={{
-            color: "#aaa",
-            fontSize: "13px",
-            marginBottom: "4px",
-          }}
-        >
-          {followUp.quotes?.quote_number || "Quote"}
-        </div>
-
-        <div
-          style={{
-            color: "#aaa",
-            fontSize: "13px",
-            marginBottom: "8px",
-          }}
-        >
-          {followUp.quotes?.project_address || ""}
-        </div>
-
-        <div
-          style={{
-            color: "#f97316",
-            fontSize: "13px",
-            fontWeight: 700,
-          }}
-        >
-          Due: {new Date(followUp.due_at).toLocaleString()}
-        </div>
-      </div>
-    ))}
-  </div>
-)}
           {/* CURRENT JOBS */}
 {currentJobs.length > 0 && (
   <div
