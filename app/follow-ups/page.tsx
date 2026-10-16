@@ -72,6 +72,9 @@ export default function FollowUpsPage() {
   const isFinished = (item: FollowUp) => ["Sent", "Completed", "Dismissed"].includes(item.status);
   const pendingCount = eligible.filter((item) => !isFinished(item)).length;
   const finishedCount = eligible.filter(isFinished).length;
+  const now = Date.now();
+  const isDue = (item: FollowUp) => !isFinished(item) && item.quotes?.status === "Sent" && Number.isFinite(new Date(item.due_at).getTime()) && new Date(item.due_at).getTime() <= now;
+  const dueCount = eligible.filter(isDue).length;
   const visible = eligible.filter((item) => {
     if (filter === "Pending" && isFinished(item)) return false;
     if (filter === "Finished" && !isFinished(item)) return false;
@@ -142,6 +145,7 @@ export default function FollowUpsPage() {
         <section style={{ background: "#fff", padding: 24, borderRadius: 20, border: "1px solid #e7e5e4" }}>
           <h1 style={{ margin: "0 0 6px", fontSize: 30 }}>Quote Follow-Ups</h1>
           <p style={{ color: "#57534e", marginTop: 0 }}>Keep reminders moving. Removing a follow-up never removes its quote.</p>
+          <div style={{ color: dueCount ? "#b91c1c" : "#166534", fontWeight: 800, fontSize: 13, marginBottom: 14 }}>● {dueCount ? `${dueCount} follow-up${dueCount === 1 ? "" : "s"} due now` : "All caught up. No follow-ups overdue."}</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
             {(["Pending", "Finished", "All"] as Filter[]).map((choice) => (
               <button key={choice} type="button" onClick={() => setFilter(choice)} style={{
@@ -163,13 +167,14 @@ export default function FollowUpsPage() {
           {loading ? <p>Loading follow-ups...</p> : visible.length === 0 ?
             <div style={{ ...card, color: "#57534e" }}>No {filter.toLowerCase()} follow-ups found.</div> :
             visible.map((item) => (
-              <article key={item.id} style={card}>
+              <article key={item.id} style={{ ...card, border: isDue(item) ? "2px solid #dc2626" : card.border, background: isDue(item) ? "#fff7f7" : "#fff", boxShadow: isDue(item) ? "0 0 0 2px rgba(220,38,38,0.08)" : "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: 19 }}>{item.quotes?.client_name || "Unnamed Client"}</h2>
                     <div style={{ fontSize: 13, color: "#57534e", marginTop: 4 }}>{item.quotes?.quote_number || "No quote #"} · Follow-up #{item.followup_number}</div>
                     {item.quotes?.project_address && <div style={{ fontSize: 13, color: "#78716c", marginTop: 3 }}>{item.quotes.project_address}</div>}
                     <div style={{ marginTop: 10, fontSize: 14 }}>Due: <strong>{formatDateTime(item.due_at)}</strong></div>
+                    {isDue(item) && <div style={{ color: "#b91c1c", fontWeight: 800, marginTop: 7, fontSize: 13 }}>● DUE NOW {Math.floor((now - new Date(item.due_at).getTime()) / 86400000) > 0 ? `· ${Math.floor((now - new Date(item.due_at).getTime()) / 86400000)} day(s) overdue` : ""}</div>}
                   </div>
                   <span style={{ background: isFinished(item) ? "#dcfce7" : "#fef3c7", color: isFinished(item) ? "#166534" : "#92400e", padding: "7px 12px", borderRadius: 99, height: "fit-content", fontWeight: 700, fontSize: 12 }}>{item.status}</span>
                 </div>
