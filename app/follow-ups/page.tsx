@@ -41,6 +41,7 @@ export default function FollowUpsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [filter, setFilter] = useState<Filter>("Pending");
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadFollowUps = useCallback(async () => {
     setLoading(true);
@@ -178,14 +179,32 @@ export default function FollowUpsPage() {
                   </div>
                   <span style={{ background: isFinished(item) ? "#dcfce7" : "#fef3c7", color: isFinished(item) ? "#166534" : "#92400e", padding: "7px 12px", borderRadius: 99, height: "fit-content", fontWeight: 700, fontSize: 12 }}>{item.status}</span>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
-                  <button type="button" disabled={busy} onClick={() => sendFollowUpText(item)} style={action("#15803d")}>Prepare Text</button>
-                  <button type="button" disabled={busy} onClick={() => void setStatus(item, "Sent")} style={action("#1c1917")}>Mark Sent</button>
-                  <button type="button" disabled={busy} onClick={() => void setStatus(item, "Completed")} style={action("#0f766e")}>Complete</button>
-                  <button type="button" disabled={busy} onClick={() => void setStatus(item, "Dismissed")} style={action("#57534e")}>Dismiss</button>
-                  {isFinished(item) && <button type="button" disabled={busy} onClick={() => void setStatus(item, "Pending")} style={{ ...buttonBase, background: "#fff" }}>Reopen</button>}
-                  <button type="button" disabled={busy} onClick={() => void deleteOne(item)} style={action("#dc2626")}>Delete Reminder</button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16, alignItems: "center" }}>
+                  {!isFinished(item) ? (
+                    <>
+                      <button type="button" disabled={busy} onClick={() => sendFollowUpText(item)} style={action("#15803d")}>Prepare Text</button>
+                      <button type="button" disabled={busy} onClick={() => void setStatus(item, "Sent")} style={action("#1c1917")}>Mark Sent</button>
+                    </>
+                  ) : (
+                    <button type="button" disabled={busy} onClick={() => void setStatus(item, "Pending")} style={action("#15803d")}>Reopen</button>
+                  )}
+                  <button type="button" aria-expanded={expandedId === item.id} aria-controls={`followup-actions-${item.id}`}
+                    onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                    style={{ ...buttonBase, background: expandedId === item.id ? "#fff7ed" : "#fff", color: "#292524", borderColor: expandedId === item.id ? "#f97316" : "#d6d3d1" }}>
+                    More Actions {expandedId === item.id ? "▴" : "▾"}
+                  </button>
                 </div>
+                {expandedId === item.id && (
+                  <div id={`followup-actions-${item.id}`} style={{ marginTop: 10, padding: 12, border: "1px solid #e7e5e4", borderRadius: 12, background: "#fafaf9" }}>
+                    <div style={{ fontSize: 12, color: "#57534e", fontWeight: 700, marginBottom: 10 }}>REMINDER MANAGEMENT</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {!isFinished(item) && <button type="button" disabled={busy} onClick={() => void setStatus(item, "Completed")} style={action("#0f766e")}>Complete</button>}
+                      {!isFinished(item) && <button type="button" disabled={busy} onClick={() => void setStatus(item, "Dismissed")} style={action("#57534e")}>Dismiss</button>}
+                      <button type="button" disabled={busy} onClick={() => void deleteOne(item)} style={action("#dc2626")}>Delete Reminder</button>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#78716c", marginTop: 9 }}>Deleting a reminder does not delete its quote.</div>
+                  </div>
+                )}
               </article>
             ))}
         </section>
