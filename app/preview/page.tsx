@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import jsPDF from "jspdf";
+import { PDFDocument } from "pdf-lib";
 import irockLogo from "../irock-logo.png";
 
 type BusinessProfile = {
@@ -15,6 +16,8 @@ type BusinessProfile = {
   website: string | null;
   tagline: string | null;
   logo_path: string | null;
+  coi_path: string | null;
+  coi_expires_on: string | null;
 };
 
 const FALLBACK_COMPANY = {
@@ -102,7 +105,7 @@ export default function PreviewPage() {
         if (memberError || !member) throw memberError || new Error("No workspace found");
         const { data: profile, error: profileError } = await supabase
           .from("workspaces")
-          .select("name, business_name, contact_name, phone, email, address, website, tagline, logo_path")
+          .select("name, business_name, contact_name, phone, email, address, website, tagline, logo_path, coi_path, coi_expires_on")
           .eq("id", member.workspace_id)
           .single();
         if (profileError || !profile) throw profileError || new Error("No business profile found");
@@ -587,9 +590,55 @@ function buildFileName() {
       `To move forward with this project, reply to this quote or contact ${companyName} directly. Once approved, your project will be placed on the schedule.`
     );
 
-    // Export the quote itself. COI attachments will be managed through Settings
-    // once the workspace certificate upload feature is configured.
-    pdf.save(buildFileName());
+    // Attach only the current workspace certificate from private Supabase Storage.
+    // Never use the old public /coi.pdf or silently attach an expired document.
+    const certificatePath = business?.coi_path;
+    const expirationDate = business?.coi_expires_on;
+    const today = new Date();
+    const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+    if (!certificatePath) {
+      pdf.save(buildFileName());
+      return;
+    }
+    if (!expirationDate || expirationDate < localToday) {
+      alert("The certificate of insurance is expired or has no expiration date. The quote will download WITHOUT a COI. Update it in Settings.");
+      pdf.save(buildFileName());
+      return;
+    }
+
+    try {
+      const { data: certificate, error: downloadError } = await supabase.storage
+        .from("business-coi")
+        .download(certificatePath);
+      if (downloadError || !certificate) {
+        throw new Error(downloadError?.message || "Certificate download returned no file.");
+      }
+
+      const merged = await PDFDocument.create();
+      const quoteDocument = await PDFDocument.load(pdf.output("arraybuffer"));
+      const quotePages = await merged.copyPages(quoteDocument, quoteDocument.getPageIndices());
+      quotePages.forEach((page) => merged.addPage(page));
+
+      const certificateDocument = await PDFDocument.load(await certificate.arrayBuffer());
+      const certificatePages = await merged.copyPages(certificateDocument, certificateDocument.getPageIndices());
+      certificatePages.forEach((page) => merged.addPage(page));
+
+      const bytes = await merged.save();
+      const output = new Uint8Array(bytes.byteLength);
+      output.set(bytes);
+      const url = URL.createObjectURL(new Blob([output], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = buildFileName();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (error) {
+      console.error("COI attachment failed:", error);
+      alert("The COI could not be attached. No PDF was downloaded. Please check the certificate in Settings and try again.");
+    }
   }
 
   function handleEdit() {
