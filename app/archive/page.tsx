@@ -174,74 +174,63 @@ export default function ArchivePage() {
     setBusy(false);
   }
 
-  function protectedRecord(quote: QuoteItem) {
-    return quote.paymentStatus === "Paid";
-  }
+  // Owner-controlled deletion. Supabase remains responsible for enforcing
+  // foreign keys and row-level security; a failed delete never pretends to work.
+  async function deleteOne(quote: QuoteItem): Promise<boolean> {
+    const { data, error } = await supabase.from("quotes")
+      .delete()
+      .eq("id", quote.id)
+      .not("trashed_at", "is", null)
+      .select("id");
 
-  async function hasRelatedRecords(quoteId: string): Promise<boolean> {
-    // Fail closed: a missing table, column, or denied read must never make deletion safer.
-    for (const table of ["quote_share_links", "quote_followups", "invoices", "jobs", "payments"]) {
-      const { data, error } = await supabase.from(table)
-        .select("id").eq("quote_id", quoteId).limit(1);
-      if (error) {
-        console.error(`Unable to verify related records in ${table}:`, error);
-        return true;
-      }
-      if (data?.length) return true;
+    if (error) {
+      console.error(`Could not permanently delete quote ${quote.id}:`, error);
+      setErrorMessage(
+        `Could not delete ${quote.clientName || quote.quoteNumber || "this quote"}: ${error.message}. ` +
+        "The database may have linked records that require a server-side cleanup rule."
+      );
+      return false;
     }
-    return false;
+    if (!data?.length) {
+      setErrorMessage("Deletion was not confirmed by Supabase. The quote was left in Trash.");
+      return false;
+    }
+    return true;
   }
 
   async function permanentlyDelete(quote: QuoteItem) {
     if (busy) return;
-    if (protectedRecord(quote)) {
-      window.alert("Paid records are protected from permanent deletion.");
-      return;
-    }
     if (!window.confirm(`PERMANENTLY delete ${quote.clientName || "this quote"}? This cannot be undone.`)) return;
     setBusy(true);
-    if (await hasRelatedRecords(quote.id)) {
-      window.alert("This quote has related records, or access to them could not be verified. It will stay in Trash. Do not mark it Paid to bypass this protection.");
+    setErrorMessage("");
+    try {
+      const deleted = await deleteOne(quote);
+      await loadArchivedQuotes();
+      if (deleted) window.alert("Quote permanently deleted.");
+    } finally {
       setBusy(false);
-      return;
     }
-    const { data, error } = await supabase.from("quotes").delete()
-      .eq("id", quote.id)
-      .not("trashed_at", "is", null).select("id");
-    if (error || !data?.length) {
-      console.error("Permanent deletion failed:", error);
-      window.alert("Could not permanently delete this quote. It may have customer links, approvals, invoices, or other related records. No related records were intentionally deleted.");
-    }
-    await loadArchivedQuotes();
-    setBusy(false);
   }
 
   async function emptyTrash() {
     if (busy) return;
     const trash = quotes.filter(q => !!q.trashedAt);
-    const eligible = trash.filter(q => !protectedRecord(q));
-    const protectedCount = trash.length - eligible.length;
-    if (!eligible.length) {
-      window.alert("No eligible quotes to permanently delete. Paid records are protected.");
-      return;
-    }
-    if (!window.confirm(`Permanently delete ${eligible.length} trashed quote(s)? ${protectedCount} paid record(s) will be kept. This cannot be undone. Quotes with linked records may also be kept.`)) return;
+    if (!trash.length) return;
+    if (!window.confirm(`PERMANENTLY delete all ${trash.length} quote(s) in Trash? This cannot be undone.`)) return;
     setBusy(true);
+    setErrorMessage("");
     let deleted = 0;
-    let kept = 0;
-    for (const quote of eligible) {
-      if (await hasRelatedRecords(quote.id)) { kept++; continue; }
-      const { data, error } = await supabase.from("quotes").delete()
-        .eq("id", quote.id)
-        .not("trashed_at", "is", null).select("id");
-      if (error || !data?.length) {
-        kept++;
-        if (error) console.error(`Could not delete ${quote.id}:`, error);
-      } else deleted++;
+    let failed = 0;
+    try {
+      for (const quote of trash) {
+        if (await deleteOne(quote)) deleted++;
+        else failed++;
+      }
+      await loadArchivedQuotes();
+      window.alert(`${deleted} quote(s) permanently deleted. ${failed} could not be deleted and remain in Trash.`);
+    } finally {
+      setBusy(false);
     }
-    await loadArchivedQuotes();
-    setBusy(false);
-    window.alert(`${deleted} quote(s) permanently deleted. ${kept + protectedCount} kept (protected or linked records).`);
   }
 
   function getLabel(quote: QuoteItem) {
@@ -316,7 +305,7 @@ export default function ArchivePage() {
             {tab === "trash" && <button style={btnDelete} disabled={busy || !trashCount} onClick={() => void emptyTrash()}>Empty Trash</button>}
           </div>
           {errorMessage && <p role="alert" style={{ color: "#b91c1c" }}>{errorMessage}</p>}
-          {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete eligible records. Paid records and quotes with linked data are protected.</p>}
+          {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete them. You decide what goes. Database relationships may still prevent deletion until linked records can be cleaned up.</p>}
 
           <input
             placeholder="Search archive"
@@ -403,7 +392,7 @@ export default function ArchivePage() {
                       {tab === "trash" ? (
                         <>
                           <button disabled={busy} onClick={() => void restoreFromTrash(quote)} style={btnGreen}>Restore</button>
-                          <button disabled={busy || protectedRecord(quote)} onClick={() => void permanentlyDelete(quote)} style={{ ...btnDelete, opacity: protectedRecord(quote) ? 0.5 : 1 }} title={protectedRecord(quote) ? "Paid records are protected" : "Permanently delete"}>Delete Forever</button>
+                          <button disabled={busy} onClick={() => void permanentlyDelete(quote)} style={btnDelete} title="Permanently delete">Delete Forever</button>
                         </>
                       ) : (
                         <>
