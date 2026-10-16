@@ -36,7 +36,7 @@ type QuoteItem = {
 export default function ArchivePage() {
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"archive" | "trash">("archive");
+  const [tab, setTab] = useState<"completed" | "invoices" | "inactive" | "trash">("completed");
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -259,15 +259,22 @@ export default function ArchivePage() {
     return archivedBadge;
   }
 
-  const archivedCount = quotes.filter(q => !q.trashedAt).length;
+  function isCompleted(quote: QuoteItem) {
+    return !!quote.completedAt || quote.archiveReason === "Completed job";
+  }
+
+  const activeArchive = quotes.filter(q => !q.trashedAt);
+  const completedCount = activeArchive.filter(isCompleted).length;
+  const inactiveCount = activeArchive.filter(q => !isCompleted(q)).length;
   const trashCount = quotes.filter(q => !!q.trashedAt).length;
-  const filtered = quotes.filter((q) => (tab === "trash" ? !!q.trashedAt : !q.trashedAt) &&
-    `${q.clientName || ""} ${q.quoteNumber || ""} ${
-      q.projectAddress || ""
-    }`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const filtered = quotes.filter((q) => {
+    const matchesSection = tab === "trash" ? !!q.trashedAt
+      : tab === "completed" ? !q.trashedAt && isCompleted(q)
+      : tab === "inactive" ? !q.trashedAt && !isCompleted(q)
+      : false;
+    return matchesSection && `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
+      .toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <main
@@ -298,17 +305,54 @@ export default function ArchivePage() {
         </div>
 
         <div style={card}>
-          <h1 style={title}>Archive & Trash</h1>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
-            <button style={tab === "archive" ? btnOrange : navBtn} onClick={() => setTab("archive")}>Archive ({archivedCount})</button>
-            <button style={tab === "trash" ? btnOrange : navBtn} onClick={() => setTab("trash")}>Trash ({trashCount})</button>
+          <h1 style={title}>Archive Control Panel</h1>
+          <p style={{ color: "#57534e", fontSize: "14px", marginTop: "-4px" }}>
+            Job history, old estimates, and Trash. Pick a section below.
+          </p>
+          <div style={tileGrid}>
+            <button type="button" onClick={() => { setTab("completed"); setSearch(""); setErrorMessage(""); }}
+              style={{ ...tile, ...(tab === "completed" ? selectedTile : {}) }} aria-pressed={tab === "completed"}>
+              <span style={tileTop}><span style={tileIcon}>✓</span><span style={{ ...statusLight, background: tab === "completed" ? "#16a34a" : "#d6d3d1" }} /></span>
+              <span style={tileTitle}>Completed Jobs</span>
+              <span style={tileDescription}>Finished work and job history</span>
+              <span style={tileCount}>{completedCount} records</span>
+            </button>
+            <button type="button" onClick={() => { setTab("invoices"); setSearch(""); setErrorMessage(""); }}
+              style={{ ...tile, ...(tab === "invoices" ? selectedTile : {}) }} aria-pressed={tab === "invoices"}>
+              <span style={tileTop}><span style={tileIcon}>$</span><span style={{ ...statusLight, background: tab === "invoices" ? "#64748b" : "#d6d3d1" }} /></span>
+              <span style={tileTitle}>Invoices</span>
+              <span style={tileDescription}>Historical invoices and payments</span>
+              <span style={tileCount}>Connection coming next</span>
+            </button>
+            <button type="button" onClick={() => { setTab("inactive"); setSearch(""); setErrorMessage(""); }}
+              style={{ ...tile, ...(tab === "inactive" ? selectedTile : {}) }} aria-pressed={tab === "inactive"}>
+              <span style={tileTop}><span style={tileIcon}>▤</span><span style={{ ...statusLight, background: tab === "inactive" ? "#f59e0b" : "#d6d3d1" }} /></span>
+              <span style={tileTitle}>Inactive Quotes</span>
+              <span style={tileDescription}>Archived estimates and old proposals</span>
+              <span style={tileCount}>{inactiveCount} records</span>
+            </button>
+            <button type="button" onClick={() => { setTab("trash"); setSearch(""); setErrorMessage(""); }}
+              style={{ ...tile, ...(tab === "trash" ? selectedTile : {}) }} aria-pressed={tab === "trash"}>
+              <span style={tileTop}><span style={tileIcon}>×</span><span style={{ ...statusLight, background: tab === "trash" ? "#dc2626" : "#d6d3d1" }} /></span>
+              <span style={tileTitle}>Trash</span>
+              <span style={tileDescription}>Restore or permanently delete</span>
+              <span style={tileCount}>{trashCount} records</span>
+            </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
+            <h2 style={{ margin: 0, fontSize: "20px", color: "#292524" }}>
+              {tab === "completed" ? "Completed Jobs" : tab === "invoices" ? "Invoices" : tab === "inactive" ? "Inactive Quotes" : "Trash"}
+            </h2>
             {tab === "trash" && <button style={btnDelete} disabled={busy || !trashCount} onClick={() => void emptyTrash()}>Empty Trash</button>}
           </div>
           {errorMessage && <p role="alert" style={{ color: "#b91c1c" }}>{errorMessage}</p>}
           {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete them. You decide what goes. Database relationships may still prevent deletion until linked records can be cleaned up.</p>}
 
+          {tab === "invoices" ? (
+            <div style={emptyBox}>Invoice history will appear here when we connect the existing invoice records. No invoices have been moved or deleted.</div>
+          ) : (<>
           <input
-            placeholder="Search archive"
+            placeholder="Search this section"
             value={search}
             onChange={(e) =>
               setSearch(e.target.value)
@@ -318,7 +362,7 @@ export default function ArchivePage() {
 
           {filtered.length === 0 ? (
             <div style={emptyBox}>
-              {tab === "trash" ? "Trash is empty." : "No archived quotes found."}
+              {tab === "trash" ? "Trash is empty." : tab === "completed" ? "No completed jobs in Archive." : "No inactive quotes in Archive."}
             </div>
           ) : (
             <div style={{ display: "grid", gap: "14px" }}>
@@ -408,6 +452,7 @@ export default function ArchivePage() {
               })}
             </div>
           )}
+          </>)}
         </div>
       </div>
     </main>
@@ -571,3 +616,30 @@ const btnDelete = {
   padding: "8px 12px",
   cursor: "pointer",
 };
+
+const tileGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "12px",
+  marginBottom: "22px",
+};
+const tile = {
+  textAlign: "left" as const,
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "7px",
+  padding: "16px",
+  background: "#fafaf9",
+  border: "2px solid #e7e5e4",
+  borderRadius: "16px",
+  cursor: "pointer",
+  minWidth: 0,
+  color: "#292524",
+};
+const selectedTile = { background: "#fff7ed", borderColor: "#f97316" };
+const tileTop = { display: "flex", alignItems: "center", justifyContent: "space-between" };
+const tileIcon = { fontSize: "24px", fontWeight: 800, lineHeight: 1 };
+const statusLight = { width: "12px", height: "12px", borderRadius: "50%", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.1)" };
+const tileTitle = { fontSize: "16px", fontWeight: 800 };
+const tileDescription = { fontSize: "12px", color: "#57534e" };
+const tileCount = { fontSize: "12px", fontWeight: 700, color: "#9a3412" };
