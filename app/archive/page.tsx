@@ -48,7 +48,7 @@ export default function ArchivePage() {
     const { data, error } = await supabase
       .from("quotes")
       .select("*")
-      .eq("status", "Archived")
+      .or("status.eq.Archived,trashed_at.not.is.null")
       .order("archived_at", { ascending: false });
 
     if (error) {
@@ -151,11 +151,20 @@ export default function ArchivePage() {
   }
 
   async function restoreFromTrash(quote: QuoteItem) {
-    if (busy || !window.confirm(`Restore ${quote.clientName || "this quote"} to Archive?`)) return;
+    if (busy || !window.confirm(`Restore ${quote.clientName || "this quote"} to its previous location?`)) return;
     setBusy(true);
+    const originalStatus = quote.preTrashStatus || "Archived";
+    const allowedStatuses: QuoteStatus[] = ["Draft", "Sent", "Approved", "Completed", "Archived"];
+    const restoreStatus: QuoteStatus = allowedStatuses.includes(originalStatus as QuoteStatus)
+      ? originalStatus as QuoteStatus : "Archived";
     const { data, error } = await supabase.from("quotes")
-      .update({ trashed_at: null, pre_trash_status: null })
-      .eq("id", quote.id).eq("status", "Archived").not("trashed_at", "is", null)
+      .update({
+        status: restoreStatus,
+        trashed_at: null,
+        pre_trash_status: null,
+        ...(restoreStatus !== "Archived" ? { archived_at: null, archive_reason: null } : {}),
+      })
+      .eq("id", quote.id).not("trashed_at", "is", null)
       .select("id");
     if (error || !data?.length) {
       window.alert("Could not restore this quote. Please try again.");
@@ -198,7 +207,7 @@ export default function ArchivePage() {
       return;
     }
     const { data, error } = await supabase.from("quotes").delete()
-      .eq("id", quote.id).eq("status", "Archived")
+      .eq("id", quote.id)
       .not("trashed_at", "is", null).select("id");
     if (error || !data?.length) {
       console.error("Permanent deletion failed:", error);
@@ -224,7 +233,7 @@ export default function ArchivePage() {
     for (const quote of eligible) {
       if (await hasRelatedRecords(quote.id)) { kept++; continue; }
       const { data, error } = await supabase.from("quotes").delete()
-        .eq("id", quote.id).eq("status", "Archived")
+        .eq("id", quote.id)
         .not("trashed_at", "is", null).select("id");
       if (error || !data?.length) {
         kept++;
@@ -308,7 +317,7 @@ export default function ArchivePage() {
             {tab === "trash" && <button style={btnDelete} disabled={busy || !trashCount} onClick={() => void emptyTrash()}>Empty Trash</button>}
           </div>
           {errorMessage && <p role="alert" style={{ color: "#b91c1c" }}>{errorMessage}</p>}
-          {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to Archive or permanently delete eligible records. Approved, completed, and paid jobs are protected.</p>}
+          {tab === "trash" && <p style={{ color: "#57534e", fontSize: "13px" }}>Restore quotes to their previous location or permanently delete eligible records. Approved, completed, and paid jobs are protected.</p>}
 
           <input
             placeholder="Search archive"
@@ -394,7 +403,7 @@ export default function ArchivePage() {
                     <div style={buttonRow}>
                       {tab === "trash" ? (
                         <>
-                          <button disabled={busy} onClick={() => void restoreFromTrash(quote)} style={btnGreen}>Restore to Archive</button>
+                          <button disabled={busy} onClick={() => void restoreFromTrash(quote)} style={btnGreen}>Restore</button>
                           <button disabled={busy || protectedRecord(quote)} onClick={() => void permanentlyDelete(quote)} style={{ ...btnDelete, opacity: protectedRecord(quote) ? 0.5 : 1 }} title={protectedRecord(quote) ? "Completed/paid records are protected" : "Permanently delete"}>Delete Forever</button>
                         </>
                       ) : (
