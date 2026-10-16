@@ -22,6 +22,7 @@ type QuoteItem = {
   sentAt?: string;
   approvedAt?: string;
   archiveReason?: string;
+  trashedAt?: string | null;
 };
 
 export default function QuotesPage() {
@@ -29,6 +30,7 @@ export default function QuotesPage() {
   const [search, setSearch] = useState("");
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [emailingId, setEmailingId] = useState<string | null>(null);
+  const [trashingId, setTrashingId] = useState<string | null>(null);
 
   useEffect(() => {
     migrateLegacyQuotesIfNeeded();
@@ -167,6 +169,7 @@ export default function QuotesPage() {
     scopeOfWork: quote.scope_of_work || "",
     bannerImage: quote.banner_image_url || quote.banner_image || "",
     status: quote.status || "Draft",
+    trashedAt: quote.trashed_at || null,
     archivedAt: quote.archived_at || "",
     completedAt: quote.completed_at || "",
     sentAt: quote.sent_at || "",
@@ -298,24 +301,33 @@ export default function QuotesPage() {
   }
 
   async function deleteQuote(quoteToDelete: QuoteItem) {
+    if (trashingId !== null) return;
     const confirmed = window.confirm(
-      `Delete quote for ${quoteToDelete.clientName || "this client"}?`
+      `Move quote for ${quoteToDelete.clientName || "this client"} to Trash? You can restore it later.`
     );
-
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("quotes")
-      .delete()
-      .eq("id", quoteToDelete.id);
+    setTrashingId(quoteToDelete.id);
+    try {
+      const { data, error } = await supabase
+        .from("quotes")
+        .update({
+          trashed_at: new Date().toISOString(),
+          pre_trash_status: quoteToDelete.status || "Draft",
+        })
+        .eq("id", quoteToDelete.id)
+        .is("trashed_at", null)
+        .select("id");
 
-    if (error) {
-      console.error("Failed to delete quote:", error);
-      alert("Could not delete this quote. It may have related records. No data was removed from the list.");
-      return;
+      if (error || !data?.length) {
+        console.error("Failed to move quote to Trash:", error);
+        window.alert("Could not move this quote to Trash. Nothing was deleted.");
+        return;
+      }
+      await loadQuotes();
+    } finally {
+      setTrashingId(null);
     }
-
-    await loadQuotes();
   }
 
   async function updateStatus(
@@ -400,7 +412,7 @@ if (status === "Sent" && updatedQuote) {
     return { bg: "#fff7ed", text: "#9a3412", border: "#fdba74" };
   }
 
-  const visibleQuotes = quotes.filter((q) => !["Approved", "Archived"].includes(q.status || "Draft"));
+  const visibleQuotes = quotes.filter((q) => !q.trashedAt && !["Approved", "Archived"].includes(q.status || "Draft"));
 
   const filtered = visibleQuotes.filter((q) =>
     `${q.clientName || ""} ${q.quoteNumber || ""} ${q.projectAddress || ""}`
@@ -543,9 +555,10 @@ if (status === "Sent" && updatedQuote) {
 
                       <button
                         onClick={() => deleteQuote(quote)}
-                        style={btnDelete}
+                        disabled={trashingId !== null}
+                        style={{ ...btnDelete, opacity: trashingId !== null ? 0.65 : 1 }}
                       >
-                        Delete
+                        {trashingId === quote.id ? "Moving..." : "Trash"}
                       </button>
                     </div>
                   </div>
