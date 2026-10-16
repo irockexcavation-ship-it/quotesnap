@@ -15,6 +15,7 @@ type Invoice = {
   status: string | null;
   invoice_date: string | null;
   due_date: string | null;
+  archived_at: string | null;
 };
 
 type BusinessProfile = {
@@ -39,6 +40,10 @@ const FALLBACK_BUSINESS = {
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [view, setView] = useState<"active" | "paid" | "archive">("active");
+  const [search, setSearch] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [listError, setListError] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
+    if (params.get("view") === "archive") setView("archive");
     setSelectedId(id);
 
     if (id) {
@@ -67,7 +73,7 @@ export default function InvoicesPage() {
     const { data, error } = await supabase
       .from("invoices")
       .select(
-        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
+        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date, archived_at"
       )
       .order("created_at", { ascending: false });
 
@@ -81,13 +87,35 @@ export default function InvoicesPage() {
     setLoading(false);
   }
 
+  async function setInvoiceArchived(invoice: Invoice, archived: boolean) {
+    if (!window.confirm(`${archived ? "Archive" : "Restore"} invoice ${invoice.invoice_number || invoice.client_name || "this invoice"}?`)) return;
+    setBusyId(invoice.id);
+    setListError("");
+    const { error } = await supabase.from("invoices")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("id", invoice.id);
+    setBusyId(null);
+    if (error) { setListError(`Could not ${archived ? "archive" : "restore"} invoice: ${error.message}`); return; }
+    await loadInvoices();
+  }
+
+  async function deleteInvoice(invoice: Invoice) {
+    if (!window.confirm(`Permanently delete invoice ${invoice.invoice_number || invoice.client_name || "this invoice"}? This cannot be undone. Do not delete invoices you need for accounting or taxes.`)) return;
+    setBusyId(invoice.id);
+    setListError("");
+    const { error } = await supabase.from("invoices").delete().eq("id", invoice.id);
+    setBusyId(null);
+    if (error) { setListError(`Could not delete invoice: ${error.message}`); return; }
+    await loadInvoices();
+  }
+
   async function loadInvoice(id: string) {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("invoices")
       .select(
-        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
+        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date, archived_at"
       )
       .eq("id", id)
       .single();
@@ -361,7 +389,7 @@ export default function InvoicesPage() {
       .update(updates)
       .eq("id", selectedInvoice.id)
       .select(
-        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date"
+        "id, workspace_id, invoice_number, client_name, project_address, total, amount_paid, status, invoice_date, due_date, archived_at"
       )
       .single();
 
@@ -622,95 +650,52 @@ export default function InvoicesPage() {
           </button>
         </div>
 
-        {invoices.length === 0 ? (
-          <div
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: "14px",
-              padding: "30px 20px",
-              textAlign: "center",
-              color: "#666",
-            }}
-          >
-            No invoices yet.
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: "14px" }}>
-            {invoices.map((invoice) => {
-              const balance =
-                Number(invoice.total || 0) - Number(invoice.amount_paid || 0);
-
-              return (
-                <div
-                  key={invoice.id}
-                  onClick={() => {
-                    window.location.href = `/invoices?id=${invoice.id}`;
-                  }}
-                  style={{
-                    border: "1px solid #ddd",
-                    borderRadius: "14px",
-                    padding: "18px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "15px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: "20px", fontWeight: 700 }}>
-                        {invoice.client_name || "Unnamed Client"}
-                      </div>
-
-                      <div style={{ color: "#555", marginTop: "4px" }}>
-                        {invoice.invoice_number || "No invoice number"}
-                      </div>
-
-                      {invoice.project_address && (
-                        <div style={{ color: "#777", marginTop: "3px" }}>
-                          {invoice.project_address}
-                        </div>
-                      )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+          {(["active", "paid", "archive"] as const).map((section) => {
+            const count = invoices.filter((invoice) => section === "archive" ? !!invoice.archived_at : !invoice.archived_at && (section === "paid" ? Number(invoice.total || 0) <= Number(invoice.amount_paid || 0) : Number(invoice.total || 0) > Number(invoice.amount_paid || 0))).length;
+            return <button key={section} type="button" onClick={() => setView(section)} style={{ ...blackButton, background: view === section ? "#f97316" : "#292524", color: "white" }}>
+              {section === "active" ? "Active" : section === "paid" ? "Paid" : "Archive"} ({count})
+            </button>;
+          })}
+        </div>
+        <input aria-label="Search invoices" placeholder="Search customer, invoice number, or address" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", marginBottom: "16px" }} />
+        {listError && <p role="alert" style={{ color: "#b91c1c" }}>{listError}</p>}
+        {(() => {
+          const visible = invoices.filter((invoice) => {
+            const archived = !!invoice.archived_at;
+            const paid = Number(invoice.amount_paid || 0) >= Number(invoice.total || 0);
+            const matchesView = view === "archive" ? archived : !archived && (view === "paid" ? paid : !paid);
+            const query = search.trim().toLowerCase();
+            return matchesView && (!query || [invoice.client_name, invoice.invoice_number, invoice.project_address].some((value) => (value || "").toLowerCase().includes(query)));
+          });
+          if (!visible.length) return <div style={{ padding: "25px", textAlign: "center", color: "#777", border: "1px solid #ddd", borderRadius: "12px" }}>No invoices in this section.</div>;
+          return <div style={{ display: "grid", gap: "14px" }}>
+            {visible.map((invoice) => {
+              const balance = Math.max(Number(invoice.total || 0) - Number(invoice.amount_paid || 0), 0);
+              return <div key={invoice.id} style={{ border: "1px solid #ddd", borderRadius: "14px", padding: "18px" }}>
+                <div onClick={() => { window.location.href = `/invoices?id=${invoice.id}`; }} style={{ cursor: "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                    <div><strong style={{ fontSize: "19px" }}>{invoice.client_name || "Unnamed Client"}</strong>
+                      <div style={{ color: "#555", marginTop: "5px" }}>{invoice.invoice_number || "No invoice number"} · {invoice.invoice_date || "No date"}</div>
+                      <div style={{ color: "#777", marginTop: "4px" }}>{invoice.project_address || ""}</div>
                     </div>
-
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        background: "#fff7ed",
-                        border: "1px solid #fdba74",
-                        borderRadius: "999px",
-                        padding: "7px 12px",
-                        height: "fit-content",
-                      }}
-                    >
-                      {invoice.status || "Draft"}
-                    </div>
+                    <strong style={{ color: balance === 0 ? "#15803d" : "#b45309" }}>{balance === 0 ? "PAID" : invoice.status || "Unpaid"}</strong>
                   </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "24px",
-                      flexWrap: "wrap",
-                      marginTop: "18px",
-                    }}
-                  >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "24px", marginTop: "14px" }}>
                     <SmallMoney label="Total" value={money(invoice.total)} />
                     <SmallMoney label="Paid" value={money(invoice.amount_paid)} />
-                    <SmallMoney
-                      label="Balance"
-                      value={money(Math.max(balance, 0))}
-                    />
+                    <SmallMoney label="Balance" value={money(balance)} />
                   </div>
                 </div>
-              );
+                <div style={{ display: "flex", gap: "9px", flexWrap: "wrap", marginTop: "16px" }}>
+                  <button disabled={busyId === invoice.id} style={blackButton} onClick={() => void setInvoiceArchived(invoice, !invoice.archived_at)}>{invoice.archived_at ? "Restore" : "Archive"}</button>
+                  <button disabled={busyId === invoice.id} style={{ ...blackButton, background: "#991b1b" }} onClick={() => void deleteInvoice(invoice)}>Delete Forever</button>
+                </div>
+              </div>;
             })}
-          </div>
-        )}
+          </div>;
+        })()}
+
       </div>
     </main>
   );
