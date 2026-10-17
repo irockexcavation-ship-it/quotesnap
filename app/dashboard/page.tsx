@@ -10,6 +10,19 @@ export default function DashboardPage() {
   const [acceptedValue, setAcceptedValue] = useState(0);
   const [overduePayments, setOverduePayments] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [dayMode, setDayMode] = useState(false);
+  const [recentApprovals, setRecentApprovals] = useState(0);
+
+  useEffect(() => {
+    try { setDayMode(localStorage.getItem("quotesnap-dashboard-theme") === "day"); } catch {}
+  }, []);
+
+  function chooseTheme(day: boolean) {
+    setDayMode(day);
+    try { localStorage.setItem("quotesnap-dashboard-theme", day ? "day" : "night"); } catch {}
+  }
+
 
   useEffect(() => {
     loadDashboard();
@@ -22,6 +35,7 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     setLoading(true);
+    setLoadFailed(false);
 
     try {
       const { data: quotes, error: quotesError } = await supabase
@@ -30,6 +44,7 @@ export default function DashboardPage() {
 
       if (quotesError) {
         console.error("Dashboard quote load failed:", quotesError);
+        setLoadFailed(true);
       } else if (quotes) {
         const open = quotes.filter(
           (quote) => quote.status === "Sent" || quote.status === "Draft"
@@ -41,6 +56,11 @@ export default function DashboardPage() {
 
         setOpenQuotes(open.length);
         setAcceptedJobs(accepted.length);
+        const lastDay = Date.now() - 24 * 60 * 60 * 1000;
+        setRecentApprovals(accepted.filter((q: any) => {
+          const stamp = new Date(q.approved_at || "").getTime();
+          return Number.isFinite(stamp) && stamp >= lastDay;
+        }).length);
 setCurrentJobs(accepted);
         const total = accepted.reduce((sum, quote) => {
           const amount = Number(quote.project_total || 0);
@@ -67,6 +87,7 @@ setCurrentJobs(accepted);
 
       if (followUpError) {
         console.error("Dashboard follow-up load failed:", followUpError);
+        setLoadFailed(true);
         setFollowUps(0);
         setDueFollowUps([]);
       } else {
@@ -89,6 +110,7 @@ setCurrentJobs(accepted);
       }
     } catch (error) {
       console.error("Dashboard load failed:", error);
+      setLoadFailed(true);
     }
 
     setLoading(false);
@@ -130,11 +152,22 @@ setCurrentJobs(accepted);
     window.location.href = path;
   };
 
+  const isRed = !loading && (loadFailed || overduePayments > 0);
+  const isAmber = !loading && !isRed && (dueFollowUps.length > 0 || recentApprovals > 0);
+  const activeStatus = loading ? "loading" : isRed ? "red" : isAmber ? "amber" : "green";
+  const pageBg = dayMode ? "#eaf2f9" : "#0d0d0d";
+  const panelBg = dayMode ? "#ffffff" : "#151515";
+  const gaugeBg = dayMode ? "#f8fafc" : "#181818";
+  const mainText = dayMode ? "#17263b" : "#ffffff";
+  const mutedText = dayMode ? "#52647a" : "#aaaaaa";
+  const panelBorder = dayMode ? "#c7d6e7" : "#333333";
+  const accent = dayMode ? "#1765b1" : "#f97316";
+
   const gaugeStyle = {
     flex: "1 1 140px",
     minWidth: "140px",
-    background: "#181818",
-    border: "1px solid #333",
+    background: gaugeBg,
+    border: `1px solid ${panelBorder}`,
     borderRadius: "18px",
     padding: "22px 14px",
     textAlign: "center" as const,
@@ -146,12 +179,13 @@ setCurrentJobs(accepted);
     <main
       style={{
         minHeight: "100vh",
-        background: "#0d0d0d",
-        color: "white",
+        background: pageBg,
+        color: mainText,
         fontFamily: "Arial, sans-serif",
         padding: "24px",
       }}
     >
+      <style jsx>{`@keyframes qsPulse { 0%,100% { opacity: 1; filter: brightness(1.1); } 50% { opacity: .38; filter: brightness(.65); } } .qs-attention-light { animation: qsPulse 1.2s ease-in-out infinite; }`}</style>
       <div
         style={{
           width: "100%",
@@ -173,7 +207,7 @@ setCurrentJobs(accepted);
             <div
               onClick={() => goTo("/")}
               style={{
-                color: "#f97316",
+                color: accent,
                 fontSize: "14px",
                 fontWeight: 700,
                 cursor: "pointer",
@@ -195,7 +229,7 @@ setCurrentJobs(accepted);
 
             <div
               style={{
-                color: "#888",
+                color: mutedText,
                 marginTop: "4px",
                 letterSpacing: "2px",
                 fontSize: "12px",
@@ -206,23 +240,52 @@ setCurrentJobs(accepted);
             <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "13px", letterSpacing: "2px", marginTop: "12px" }}>
               DIRT DON&apos;T LIE.
             </div>
-            <div style={{ color: "#aaa", fontSize: "11px", letterSpacing: "1px", marginTop: "5px" }}>
-              BY iROCK INDUSTRIES · BUILT FROM THE GROUND UP
+            <div style={{ color: mutedText, fontSize: "11px", letterSpacing: "1px", marginTop: "5px" }}>
+              BUILT FOR THE PEOPLE WHO BUILD THINGS
             </div>
           </div>
 
-          <div
-            style={{
-              background: "#181818",
-              border: "1px solid #333",
-              borderRadius: "12px",
-              padding: "10px 14px",
-              color: "#f97316",
-              fontWeight: 800,
-              fontSize: "13px",
-            }}
-          >
-            ● SYSTEM READY
+          <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
+            <div style={{ background: gaugeBg, border: `1px solid ${panelBorder}`, borderRadius: 14, padding: "13px 16px", minWidth: 215 }}>
+              <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: 2, color: mutedText, marginBottom: 10 }}>SYSTEM STATUS</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {([
+                  { key: "green", title: "SYSTEM READY", color: "#22c55e", path: "/dashboard" },
+                  { key: "amber", title: "NEEDS ATTENTION", color: "#f59e0b", path: "/follow-ups" },
+                  { key: "red", title: "RED ALERT", color: "#ef4444", path: loadFailed ? "/dashboard" : "/current-jobs" },
+                ] as const).map((light) => {
+                  const active = activeStatus === light.key;
+                  return (
+                    <button key={light.key} type="button" onClick={() => goTo(light.path)}
+                      title={light.key === "amber" ? "Due follow-ups or new approvals in the past 24 hours" : light.key === "red" ? "Data load error or overdue payments" : "Dashboard operating normally"}
+                      style={{ display: "flex", alignItems: "center", gap: 11, padding: 0, background: "none", border: 0, cursor: "pointer", textAlign: "left", color: active ? mainText : mutedText, fontWeight: active ? 900 : 600, fontSize: 11, letterSpacing: .7 }}>
+                      <span className={active && light.key === "amber" ? "qs-attention-light" : ""}
+                        style={{ display: "inline-block", width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
+                          background: active ? light.color : dayMode ? "#c8d0d9" : "#353535",
+                          border: `1px solid ${active ? light.color : dayMode ? "#aab9c9" : "#555"}`,
+                          boxShadow: active ? `0 0 14px ${light.color}, inset 0 0 5px #ffffff66` : "none" }} />
+                      {light.title}
+                    </button>
+                  );
+                })}
+              </div>
+              {activeStatus === "amber" && <div style={{ marginTop: 10, color: mutedText, fontSize: 11 }}>
+                {dueFollowUps.length > 0 ? `${dueFollowUps.length} follow-up(s) due` : `${recentApprovals} recently approved quote(s)`}
+              </div>}
+              {activeStatus === "red" && <div style={{ marginTop: 10, color: "#dc2626", fontSize: 11 }}>
+                {loadFailed ? "Dashboard data unavailable" : `${overduePayments} overdue payment(s)`}
+              </div>}
+            </div>
+            <div style={{ background: gaugeBg, border: `1px solid ${panelBorder}`, borderRadius: 14, padding: "13px 16px", minWidth: 145 }}>
+              <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: 2, color: mutedText, marginBottom: 11 }}>DISPLAY MODE</div>
+              <div style={{ display: "flex", gap: 6, background: dayMode ? "#dbeafe" : "#0b1220", borderRadius: 11, padding: 5 }}>
+                <button type="button" onClick={() => chooseTheme(true)} aria-pressed={dayMode} title="Daylight mode"
+                  style={{ flex: 1, cursor: "pointer", border: 0, borderRadius: 8, padding: "10px 12px", background: dayMode ? "#2563eb" : "transparent", color: dayMode ? "white" : "#a4b7d4", fontSize: 19, boxShadow: dayMode ? "0 0 12px #60a5fa" : "none" }}>☀</button>
+                <button type="button" onClick={() => chooseTheme(false)} aria-pressed={!dayMode} title="Night mode"
+                  style={{ flex: 1, cursor: "pointer", border: 0, borderRadius: 8, padding: "10px 12px", background: !dayMode ? "#1d4ed8" : "transparent", color: !dayMode ? "white" : "#47617c", fontSize: 19, boxShadow: !dayMode ? "0 0 12px #3b82f6" : "none" }}>☾</button>
+              </div>
+              <div style={{ fontSize: 11, color: mutedText, marginTop: 10, textAlign: "center" }}>{dayMode ? "DAYLIGHT" : "NIGHT"} ACTIVE</div>
+            </div>
           </div>
         </div>
 
@@ -238,7 +301,7 @@ setCurrentJobs(accepted);
           <div onClick={() => goTo("/quotes")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>📄</div>
             <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : openQuotes}</div>
-            <div style={{ color: "#999", fontSize: "12px" }}>
+            <div style={{ color: mutedText, fontSize: "12px" }}>
               OPEN QUOTES
             </div>
             <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: "#aaa" }}>
@@ -250,7 +313,7 @@ setCurrentJobs(accepted);
           <div onClick={() => goTo("/current-jobs")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>✓</div>
             <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : acceptedJobs}</div>
-            <div style={{ color: "#999", fontSize: "12px" }}>
+            <div style={{ color: mutedText, fontSize: "12px" }}>
               ACCEPTED JOBS
             </div>
             <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: (overduePayments > 0) ? "#fca5a5" : "#86efac" }}>
@@ -262,7 +325,7 @@ setCurrentJobs(accepted);
           <div onClick={() => goTo("/follow-ups")} style={gaugeStyle}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>⏱</div>
             <div style={{ fontSize: "32px", fontWeight: 900 }}>{loading ? "..." : followUps}</div>
-            <div style={{ color: "#999", fontSize: "12px" }}>
+            <div style={{ color: mutedText, fontSize: "12px" }}>
               FOLLOW-UPS
             </div>
             <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: (dueFollowUps.length > 0) ? "#fca5a5" : "#86efac" }}>
@@ -277,7 +340,7 @@ setCurrentJobs(accepted);
            <div style={{ fontSize: "28px", fontWeight: 900 }}>
   {loading ? "..." : `$${acceptedValue.toLocaleString()}`}
 </div>
-            <div style={{ color: "#999", fontSize: "12px" }}>
+            <div style={{ color: mutedText, fontSize: "12px" }}>
               ACCEPTED VALUE
             </div>
             <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", fontSize: "11px", fontWeight: 700, color: (overduePayments > 0) ? "#fca5a5" : "#86efac" }}>
@@ -300,7 +363,7 @@ setCurrentJobs(accepted);
     <div
       style={{
         fontSize: "13px",
-        color: "#f97316",
+        color: accent,
         fontWeight: 800,
         letterSpacing: "1px",
         marginBottom: "16px",
@@ -314,8 +377,8 @@ setCurrentJobs(accepted);
         key={job.id}
         onClick={() => openQuotePreview(job)}
         style={{
-          background: "#202020",
-          border: "1px solid #333",
+          background: gaugeBg,
+          border: `1px solid ${panelBorder}`,
           borderRadius: "14px",
           padding: "16px",
           marginBottom: "10px",
@@ -343,7 +406,7 @@ setCurrentJobs(accepted);
 
             <div
               style={{
-                color: "#aaa",
+                color: mutedText,
                 fontSize: "13px",
                 marginBottom: "4px",
               }}
@@ -353,7 +416,7 @@ setCurrentJobs(accepted);
 
             <div
               style={{
-                color: "#aaa",
+                color: mutedText,
                 fontSize: "13px",
               }}
             >
@@ -394,8 +457,8 @@ setCurrentJobs(accepted);
         {/* QUICK ACTIONS */}
         <div
           style={{
-            background: "#151515",
-            border: "1px solid #333",
+            background: panelBg,
+            border: `1px solid ${panelBorder}`,
             borderRadius: "18px",
             padding: "22px",
             marginBottom: "20px",
@@ -404,7 +467,7 @@ setCurrentJobs(accepted);
           <div
             style={{
               fontSize: "13px",
-              color: "#f97316",
+              color: accent,
               fontWeight: 800,
               letterSpacing: "1px",
               marginBottom: "16px",
@@ -420,7 +483,7 @@ setCurrentJobs(accepted);
               gap: "12px",
             }}
           >
-            <Action
+            <Action dayMode={dayMode}
               icon="＋"
               label="NEW QUOTE"
               onClick={() => {
@@ -429,37 +492,37 @@ setCurrentJobs(accepted);
 }}
             />
 
-            <Action
+            <Action dayMode={dayMode}
               icon="📄"
               label="QUOTES"
               onClick={() => goTo("/quotes")}
             />
 
-            <Action
+            <Action dayMode={dayMode}
               icon="⏱"
               label="FOLLOW-UPS"
               onClick={() => goTo("/follow-ups")}
             />
 
-            <Action
+            <Action dayMode={dayMode}
               icon="✓"
               label="CURRENT JOBS"
               onClick={() => goTo("/current-jobs")}
             />
 
-            <Action
+            <Action dayMode={dayMode}
               icon="🧾"
               label="INVOICES"
               onClick={() => goTo("/invoices")}
             />
 
-            <Action
+            <Action dayMode={dayMode}
               icon="📦"
               label="ARCHIVE"
               onClick={() => goTo("/archive")}
             />
 
-            <Action
+            <Action dayMode={dayMode}
               icon="⚙"
               label="SETTINGS"
               onClick={() => goTo("/settings")}
@@ -470,8 +533,8 @@ setCurrentJobs(accepted);
         {/* FUTURE AI PANEL */}
         <div
           style={{
-            background: "#151515",
-            border: "1px solid #333",
+            background: panelBg,
+            border: `1px solid ${panelBorder}`,
             borderRadius: "18px",
             padding: "22px",
           }}
@@ -526,19 +589,21 @@ function Action({
   icon,
   label,
   onClick,
+  dayMode,
 }: {
   icon: string;
   label: string;
   onClick: () => void;
+  dayMode: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       style={{
-        background: "#222",
-        border: "1px solid #3a3a3a",
+        background: dayMode ? "#f1f6fc" : "#222",
+        border: dayMode ? "1px solid #c7d6e7" : "1px solid #3a3a3a",
         borderRadius: "12px",
-        color: "white",
+        color: dayMode ? "#17263b" : "white",
         padding: "18px 12px",
         cursor: "pointer",
         fontWeight: 800,
@@ -548,7 +613,7 @@ function Action({
       <div
         style={{
           fontSize: "24px",
-          color: "#f97316",
+          color: accent,
           marginBottom: "7px",
         }}
       >
