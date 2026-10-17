@@ -15,6 +15,7 @@ export default function HomePage() {
         alignItems: "center",
         fontFamily: "Arial, sans-serif",
         padding: "24px",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -27,6 +28,7 @@ export default function HomePage() {
           boxShadow: "0 16px 40px rgba(0,0,0,0.12)",
           textAlign: "center",
           border: "1px solid #e7e5e4",
+          boxSizing: "border-box",
         }}
       >
         <img
@@ -40,61 +42,29 @@ export default function HomePage() {
           }}
         />
 
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "34px",
-            fontWeight: 800,
-            color: "#111111",
-          }}
-        >
+        <h1 style={{ margin: 0, fontSize: "34px", fontWeight: 800, color: "#111111" }}>
           QuoteSnap
         </h1>
 
-        <p
-          style={{
-            margin: "8px 0 30px",
-            color: "#666666",
-            fontSize: "15px",
-          }}
-        >
-          Fast quotes. Rock-solid workflow.
+        <p style={{ margin: "8px 0 30px", color: "#666666", fontSize: "15px" }}>
+          Fast quotes. Simple invoicing. Built for your business.
         </p>
 
-        <button
-          onClick={() => goTo("/new-quote")}
-          style={buttonStyle}
-        >
-          ＋ NEW QUOTE
+        <button type="button" onClick={() => goTo("/login")} style={buttonStyle}>
+          LOG IN
         </button>
 
         <button
-          onClick={() => goTo("/quotes")}
-          style={buttonStyle}
+          type="button"
+          onClick={() => goTo("/signup")}
+          style={{ ...buttonStyle, background: "#111111", marginBottom: 0 }}
         >
-          ▤ QUOTES
+          CREATE ACCOUNT
         </button>
 
-        <button
-          onClick={() => goTo("/dashboard")}
-          style={{
-            ...buttonStyle,
-            background: "#111111",
-            marginBottom: 0,
-          }}
-        >
-          ◉ DASHBOARD
-        </button>
-
-        <div
-          style={{
-            marginTop: "28px",
-            fontSize: "12px",
-            color: "#999999",
-          }}
-        >
-          iRock LLC
-        </div>
+        <p style={{ margin: "24px 0 0", color: "#78716c", fontSize: "12px" }}>
+          Your business. Your quotes. Your customers.
+        </p>
       </div>
     </main>
   );
