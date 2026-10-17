@@ -12,7 +12,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [dayMode, setDayMode] = useState(false);
-  const [recentApprovals, setRecentApprovals] = useState(0);
+  const [recentApprovals, setRecentApprovals] = useState<any[]>([]);
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
+  const [approvalError, setApprovalError] = useState("");
 
   useEffect(() => {
     try { setDayMode(localStorage.getItem("quotesnap-dashboard-theme") === "day"); } catch {}
@@ -56,11 +58,19 @@ export default function DashboardPage() {
 
         setOpenQuotes(open.length);
         setAcceptedJobs(accepted.length);
-        const lastDay = Date.now() - 24 * 60 * 60 * 1000;
-        setRecentApprovals(accepted.filter((q: any) => {
-          const stamp = new Date(q.approved_at || "").getTime();
-          return Number.isFinite(stamp) && stamp >= lastDay;
-        }).length);
+        // An approval stays new until explicitly acknowledged, even across devices.
+        // The acknowledgement table is protected by workspace-scoped RLS.
+        const { data: acknowledgments, error: acknowledgmentError } = await supabase
+          .from("quote_approval_acknowledgments")
+          .select("quote_id");
+        if (acknowledgmentError) {
+          console.error("Approval acknowledgments unavailable:", acknowledgmentError);
+          setLoadFailed(true);
+          setRecentApprovals([]);
+        } else {
+          const seen = new Set((acknowledgments || []).map((item: any) => item.quote_id));
+          setRecentApprovals(accepted.filter((q: any) => q.approved_at && !seen.has(q.id)));
+        }
 setCurrentJobs(accepted);
         const total = accepted.reduce((sum, quote) => {
           const amount = Number(quote.project_total || 0);
@@ -115,6 +125,38 @@ setCurrentJobs(accepted);
 
     setLoading(false);
   }
+  async function acknowledgeApproval(record: any) {
+    if (!record?.id || !record?.workspace_id) return;
+    setAcknowledgingId(record.id);
+    setApprovalError("");
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw authError || new Error("Please sign in again.");
+      const { error } = await supabase.from("quote_approval_acknowledgments").insert({
+        workspace_id: record.workspace_id,
+        quote_id: record.id,
+        acknowledged_by: auth.user.id,
+      });
+      // A second member may have acknowledged the same approval already.
+      if (error && error.code !== "23505") throw error;
+      setRecentApprovals((items) => items.filter((q) => q.id !== record.id));
+      openQuotePreview(record);
+    } catch (error) {
+      console.error("Approval acknowledgment failed:", error);
+      setApprovalError(error instanceof Error ? error.message : "Could not acknowledge approval.");
+    } finally {
+      setAcknowledgingId(null);
+    }
+  }
+
+  function handleAmberClick() {
+    if (dueFollowUps.length > 0) {
+      goTo("/follow-ups");
+    } else if (recentApprovals.length > 0) {
+      document.getElementById("new-approvals")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
   // Preview expects camelCase fields under quotesnapDraft.
   // Supabase rows use snake_case, so normalize them before navigating.
   function openQuotePreview(record: any) {
@@ -153,7 +195,7 @@ setCurrentJobs(accepted);
   };
 
   const isRed = !loading && (loadFailed || overduePayments > 0);
-  const isAmber = !loading && !isRed && (dueFollowUps.length > 0 || recentApprovals > 0);
+  const isAmber = !loading && !isRed && (dueFollowUps.length > 0 || recentApprovals.length > 0);
   const activeStatus = loading ? "loading" : isRed ? "red" : isAmber ? "amber" : "green";
   const pageBg = dayMode ? "#eaf2f9" : "#0d0d0d";
   const panelBg = dayMode ? "#ffffff" : "#151515";
@@ -256,7 +298,7 @@ setCurrentJobs(accepted);
                 ] as const).map((light) => {
                   const active = activeStatus === light.key;
                   return (
-                    <button key={light.key} type="button" onClick={() => goTo(light.path)}
+                    <button key={light.key} type="button" onClick={() => light.key === "amber" ? handleAmberClick() : goTo(light.path)}
                       title={light.key === "amber" ? "Due follow-ups or new approvals in the past 24 hours" : light.key === "red" ? "Data load error or overdue payments" : "Dashboard operating normally"}
                       style={{ display: "flex", alignItems: "center", gap: 11, padding: 0, background: "none", border: 0, cursor: "pointer", textAlign: "left", color: active ? mainText : mutedText, fontWeight: active ? 900 : 600, fontSize: 11, letterSpacing: .7 }}>
                       <span className={active && light.key === "amber" ? "qs-attention-light" : ""}
@@ -270,7 +312,7 @@ setCurrentJobs(accepted);
                 })}
               </div>
               {activeStatus === "amber" && <div style={{ marginTop: 10, color: mutedText, fontSize: 11 }}>
-                {dueFollowUps.length > 0 ? `${dueFollowUps.length} follow-up(s) due` : `${recentApprovals} recently approved quote(s)`}
+                {dueFollowUps.length > 0 ? `${dueFollowUps.length} follow-up(s) due` : `${recentApprovals.length} unacknowledged approval(s)`}
               </div>}
               {activeStatus === "red" && <div style={{ marginTop: 10, color: "#dc2626", fontSize: 11 }}>
                 {loadFailed ? "Dashboard data unavailable" : `${overduePayments} overdue payment(s)`}
@@ -288,6 +330,23 @@ setCurrentJobs(accepted);
             </div>
           </div>
         </div>
+
+        {recentApprovals.length > 0 && !loadFailed && (
+          <section id="new-approvals" style={{ background: panelBg, border: `1px solid ${panelBorder}`, borderRadius: 16, padding: 18, marginBottom: 22 }}>
+            <div style={{ fontWeight: 900, color: accent, marginBottom: 8 }}>NEW APPROVALS NEED REVIEW</div>
+            <p style={{ fontSize: 13, color: mutedText, marginTop: 0 }}>Review each approved job and acknowledge it. This clears the approval alert for your business.</p>
+            {recentApprovals.map((job: any) => (
+              <div key={job.id} style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0", borderTop: `1px solid ${panelBorder}` }}>
+                <div><strong>{job.client_name || "Customer"}</strong><div style={{ fontSize: 12, color: mutedText }}>{job.quote_number || "Approved quote"}</div></div>
+                <button type="button" disabled={acknowledgingId === job.id} onClick={() => acknowledgeApproval(job)}
+                  style={{ background: "#f59e0b", color: "#111827", border: 0, borderRadius: 9, padding: "11px 14px", fontWeight: 800, cursor: "pointer" }}>
+                  {acknowledgingId === job.id ? "Saving..." : "Review & Acknowledge"}
+                </button>
+              </div>
+            ))}
+            {approvalError && <p role="alert" style={{ color: "#ef4444" }}>{approvalError}</p>}
+          </section>
+        )}
 
         {/* GAUGES */}
         <div
