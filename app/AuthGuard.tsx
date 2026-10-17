@@ -12,6 +12,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   const publicQuote = pathname.startsWith("/q/");
   const guestPage = pathname === "/login" || pathname === "/signup";
+  const welcomePage = pathname === "/";
 
   useEffect(() => {
     let cancelled = false;
@@ -29,7 +30,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
 
         if (authError || !user) {
-          if (guestPage) {
+          if (guestPage || welcomePage) {
             setCheckedPath(pathname);
           } else {
             router.replace("/login");
@@ -51,8 +52,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           router.replace("/setup");
           return;
         }
-        if (hasWorkspace && (guestPage || pathname === "/setup")) {
-          router.replace("/");
+        if (hasWorkspace && (guestPage || welcomePage || pathname === "/setup")) {
+          router.replace("/dashboard");
           return;
         }
 
@@ -66,7 +67,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     void checkAccess();
     return () => { cancelled = true; };
-  }, [pathname, router, publicQuote, guestPage]);
+  }, [pathname, router, publicQuote, guestPage, welcomePage]);
 
   if (error) {
     return (
