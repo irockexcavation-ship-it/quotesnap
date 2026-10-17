@@ -47,7 +47,7 @@ export default async function CustomerQuotePage({
 }) {
   const { token } = await params;
   if (!/^[A-Za-z0-9_-]{43}$/.test(token || "")) {
-    return <Message heading="Link unavailable" body="This quote link is invalid. Please contact iRock Excavation & Hauling for a new link." />;
+    return <Message heading="Link unavailable" body="This quote link is invalid. Please contact the business that sent you this quote for a new link." />;
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -67,7 +67,7 @@ export default async function CustomerQuotePage({
     .maybeSingle();
 
   if (error || !link || link.revoked_at || (link.expires_at && Date.parse(link.expires_at) <= Date.now())) {
-    return <Message heading="Link unavailable" body="This quote link is no longer available. Please contact iRock Excavation & Hauling for a new link." />;
+    return <Message heading="Link unavailable" body="This quote link is no longer available. Please contact the business that sent you this quote for a new link." />;
   }
 
   // Count valid link opens. This is an access count, not proof a human read the quote.
@@ -91,10 +91,10 @@ export default async function CustomerQuotePage({
   if (businessError) console.error("Customer quote business profile lookup failed:", businessError);
   if (!business && !businessError) console.warn("Customer quote business profile not found for linked workspace.");
 
-  const companyName = business?.business_name?.trim() || business?.name?.trim() || "iRock Excavation & Hauling";
-  const companyPhone = business?.phone?.trim() || "(502) 552-9462";
-  const companyWebsite = business?.website?.trim() || "iRockX.com";
-  const companyTagline = business?.tagline?.trim() || "ROCK SOLID RESULTS";
+  const companyName = business?.business_name?.trim() || business?.name?.trim() || "Your contractor";
+  const companyPhone = business?.phone?.trim() || "";
+  const companyWebsite = business?.website?.trim() || "";
+  const companyTagline = business?.tagline?.trim() || "";
   const logoPath = business?.logo_path?.trim();
   const logoUrl = logoPath
     ? /^https?:\/\//i.test(logoPath)
@@ -108,7 +108,7 @@ export default async function CustomerQuotePage({
     q.includeWeatherDisclaimer && "Weather conditions, material availability, and site accessibility may affect scheduling timelines.",
     q.includeScopeDisclaimer && "Work requested outside the listed scope may require additional approval and pricing.",
     q.includeDepositNote && "A deposit may be required prior to scheduling or material delivery.",
-    q.includeAcceptanceLanguage && "Approval by reply, signature, or written confirmation authorizes iRock Excavation & Hauling to schedule and perform the work described in this quote.",
+    q.includeAcceptanceLanguage && `Approval by reply, signature, or written confirmation authorizes ${companyName} to schedule and perform the work described in this quote.`,
   ].filter(Boolean);
 
   const section: React.CSSProperties = { background: "white", border: "1px solid #e7e5e4", borderRadius: 14, padding: "20px 22px", marginTop: 18 };
@@ -125,8 +125,8 @@ export default async function CustomerQuotePage({
             )}
             <div>
               {!logoUrl && <div style={{ fontSize: 23, fontWeight: 900 }}>{companyName}</div>}
-              <div style={{ color: "#fdba74", marginTop: 7, fontSize: 13, letterSpacing: 1 }}>{companyTagline}</div>
-              <div style={{ marginTop: 12, fontSize: 13 }}>{companyPhone} · {companyWebsite}</div>
+              {companyTagline && <div style={{ color: "#fdba74", marginTop: 7, fontSize: 13, letterSpacing: 1 }}>{companyTagline}</div>}
+              {(companyPhone || companyWebsite) && <div style={{ marginTop: 12, fontSize: 13 }}>{[companyPhone, companyWebsite].filter(Boolean).join(" · ")}</div>}
             </div>
           </div>
         </header>
@@ -167,9 +167,9 @@ export default async function CustomerQuotePage({
 
         <section style={section}>
           <h2 style={{ marginTop: 0 }}>Ready to move forward?</h2>
-          <p style={{ lineHeight: 1.7 }}>Review the scope, price, and terms above. You can approve this quote securely below or call iRock with questions.</p>
+          <p style={{ lineHeight: 1.7 }}>Review the scope, price, and terms above. You can approve this quote securely below or contact {companyName} with questions.</p>
           <CustomerApprovalForm token={token} alreadyApproved={Boolean(link.accepted_at)} approvedName={link.accepted_name} />
-          <a href={`tel:${companyPhone.replace(/[^\d+]/g, "")}`} style={{ display: "inline-block", marginTop: 16, background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call iRock</a>
+          {companyPhone && <a href={`tel:${companyPhone.replace(/[^\d+]/g, "")}`} style={{ display: "inline-block", marginTop: 16, background: "#f97316", color: "white", padding: "13px 20px", borderRadius: 10, fontWeight: 800, textDecoration: "none" }}>Call {companyName}</a>}
         </section>
         <footer style={{ textAlign: "center", marginTop: 24, fontSize: 12, color: "#78716c" }}>
           Proposal issued by {companyName}
