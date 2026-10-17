@@ -56,6 +56,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authorized for this quote." }, { status: 403 });
     }
 
+    // The sender's workspace is established from the authorized quote, never from request input.
+    const { data: workspace, error: workspaceError } = await admin
+      .from("workspaces")
+      .select("name, business_name, email")
+      .eq("id", quote.workspace_id)
+      .single();
+    if (workspaceError || !workspace) {
+      return NextResponse.json({ error: "Business profile not found." }, { status: 500 });
+    }
+    const businessName = String(workspace.business_name || workspace.name || "").trim();
+    const businessEmail = String(workspace.email || "").trim();
+    if (!businessName || businessEmail.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(businessEmail)) {
+      return NextResponse.json(
+        { error: "Set a valid business name and email in Settings before emailing quotes." },
+        { status: 400 }
+      );
+    }
+
     // Explicit customer-facing fields only. Never expose internal notes or workspace records.
     const snapshot = {
       quoteNumber: quote.quote_number,
@@ -97,13 +116,13 @@ export async function POST(request: NextRequest) {
     const safeLink = escapeHtml(link);
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#222">
-        <h2 style="color:#ea580c">iRock Excavation &amp; Hauling</h2>
+        <h2 style="color:#ea580c">${escapeHtml(businessName)}</h2>
         <p>Hello ${escapeHtml(clientName)},</p>
         <p>Your quote <strong>${escapeHtml(quoteNumber)}</strong> is ready for review.</p>
         <p>Use the secure link below to view the scope and approve the quote online.</p>
         <p style="margin:28px 0"><a href="${safeLink}" style="background:#ea580c;color:#fff;padding:13px 20px;text-decoration:none;border-radius:8px">View &amp; Approve Quote</a></p>
         <p>If the button doesn't work, copy this link into your browser:<br/><a href="${safeLink}">${safeLink}</a></p>
-        <p>Thank you,<br/>iRock Excavation &amp; Hauling<br/>Rock Solid Results</p>
+        <p>Thank you,<br/>${escapeHtml(businessName)}</p>
       </div>`;
     let sent = false;
     try {
@@ -114,12 +133,12 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "iRock Excavation & Hauling <quotes@irockx.com>",
+          from: "QuoteSnap <quotes@irockx.com>",
           to: [recipient],
-          reply_to: "irockexcavation@gmail.com",
-          subject: `Your iRock Quote ${quoteNumber}`,
+          reply_to: businessEmail,
+          subject: `${businessName} | Quote ${quoteNumber}`,
           html,
-          text: `Hello ${clientName},\n\nYour quote ${quoteNumber} is ready. View and approve it here:\n${link}\n\nThank you,\niRock Excavation & Hauling`,
+          text: `Hello ${clientName},\n\nYour quote ${quoteNumber} from ${businessName} is ready. View and approve it here:\n${link}\n\nThank you,\n${businessName}`,
         }),
       });
       sent = emailResponse.ok;
