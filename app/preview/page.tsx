@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import jsPDF from "jspdf";
 import { PDFDocument } from "pdf-lib";
-import irockLogo from "../irock-logo.png";
 
 type BusinessProfile = {
   business_name: string | null;
@@ -20,17 +19,8 @@ type BusinessProfile = {
   coi_expires_on: string | null;
 };
 
-const FALLBACK_COMPANY = {
-  name: "iRock Excavation & Hauling",
-  tagline: "Rock Solid Driveway Systems",
-  phone: "(502) 552-9462",
-  email: "irockexcavation@gmail.com",
-  website: "iRockX.com",
-  logo: irockLogo.src,
-};
-
-function logoUrlFromPath(path: string | null | undefined): string {
-  if (!path) return FALLBACK_COMPANY.logo;
+function logoUrlFromPath(path: string | null | undefined): string | null {
+  if (!path?.trim()) return null;
   if (/^https?:\/\//i.test(path)) return path;
   return supabase.storage.from("business-logos").getPublicUrl(path).data.publicUrl;
 }
@@ -75,11 +65,11 @@ export default function PreviewPage() {
   const [businessError, setBusinessError] = useState("");
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
 
-  const companyName = business?.business_name?.trim() || business?.name?.trim() || FALLBACK_COMPANY.name;
-  const companyTagline = business?.tagline?.trim() || FALLBACK_COMPANY.tagline;
-  const companyPhone = business?.phone?.trim() || FALLBACK_COMPANY.phone;
-  const companyEmail = business?.email?.trim() || FALLBACK_COMPANY.email;
-  const companyWebsite = business?.website?.trim() || FALLBACK_COMPANY.website;
+  const companyName = business?.business_name?.trim() || business?.name?.trim() || "Business";
+  const companyTagline = business?.tagline?.trim() || "";
+  const companyPhone = business?.phone?.trim() || "";
+  const companyEmail = business?.email?.trim() || "";
+  const companyWebsite = business?.website?.trim() || "";
   const companyLogo = logoUrlFromPath(business?.logo_path);
 
   useEffect(() => {
@@ -112,7 +102,7 @@ export default function PreviewPage() {
         if (active) setBusiness(profile as BusinessProfile);
       } catch (error) {
         console.error("Quote preview business profile load failed:", error);
-        if (active) setBusinessError("Business profile unavailable. Using original iRock branding.");
+        if (active) setBusinessError("Business profile unavailable. PDF export is disabled until it can be loaded.");
       } finally {
         if (active) setBusinessLoading(false);
       }
@@ -135,7 +125,7 @@ export default function PreviewPage() {
 
 function buildBaseName() {
   const quoteNum =
-    quote.quoteNumber || "IR-no-number";
+    quote.quoteNumber || "no-number";
 
   const client = quote.clientName
     ? slugify(quote.clientName)
@@ -149,6 +139,10 @@ function buildFileName() {
 }
 
   async function exportPDF() {
+    if (!business) {
+      alert("Business profile unavailable. Please reload before exporting a PDF.");
+      return;
+    }
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -223,18 +217,15 @@ function buildFileName() {
       "F"
     );
 
-    try {
-      const logoData = await logoAsPngDataUrl(companyLogo);
-      pdf.addImage(logoData, "PNG", margin + 4, y + 4, 26, 18);
-    } catch (logoError) {
-      console.warn("Saved logo unavailable in PDF, trying original logo:", logoError);
+    if (companyLogo) {
       try {
-        const fallbackLogo = await logoAsPngDataUrl(FALLBACK_COMPANY.logo);
-        pdf.addImage(fallbackLogo, "PNG", margin + 4, y + 4, 26, 18);
-      } catch (fallbackError) {
-        console.warn("Could not render logo in PDF:", fallbackError);
+        const logoData = await logoAsPngDataUrl(companyLogo);
+        pdf.addImage(logoData, "PNG", margin + 4, y + 4, 26, 18);
+      } catch (logoError) {
+        console.warn("Saved business logo unavailable; PDF will omit the logo:", logoError);
       }
     }
+    const headerTextX = companyLogo ? margin + 34 : margin + 6;
 
     pdf.setTextColor(28, 25, 23);
 
@@ -245,44 +236,15 @@ function buildFileName() {
 
     pdf.setFontSize(18);
 
-    pdf.text(
-      companyName,
-      margin + 34,
-      y + 10
-    );
+    pdf.text(companyName, headerTextX, y + 10);
 
-    pdf.setFont(
-      "helvetica",
-      "normal"
-    );
-
-    pdf.setFontSize(11);
-
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
     pdf.setTextColor(87, 83, 78);
-
-    pdf.text(
-      companyTagline,
-      margin + 34,
-      y + 17
-    );
-
-    pdf.text(
-      companyPhone,
-      margin + 34,
-      y + 23
-    );
-
-    pdf.text(
-      companyEmail,
-      margin + 34,
-      y + 28
-    );
-
-    pdf.text(
-      companyWebsite,
-      margin + 34,
-      y + 33
-    );
+    const headerDetails = [companyTagline, companyPhone, companyEmail, companyWebsite].filter(Boolean);
+    headerDetails.forEach((detail, index) => {
+      pdf.text(detail, headerTextX, y + 16 + index * 5);
+    });
 
     y += 46;
 
@@ -679,7 +641,7 @@ function buildFileName() {
     const message =
   "Hi " + client + ", here is your quote" + quoteNum + " for the project we discussed. " +
   "If you have any questions or want to move forward, let me know. " +
-  `- ${business?.contact_name?.trim() || "Kenny"}, ${companyName}`;
+  `- ${business?.contact_name?.trim() || companyName}, ${companyName}`;
 
     window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
@@ -763,7 +725,7 @@ function buildFileName() {
       <div style={{ maxWidth: "900px", margin: "0 auto 20px", padding: "16px", border: "1px solid #e7e5e4", borderRadius: 16, background: "#fff" }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <button type="button" onClick={handleEdit} style={topButton("#1c1917", "#ffffff")}>Edit Quote</button>
-          <button type="button" onClick={exportPDF} disabled={businessLoading} style={{ ...topButton("#f97316", "#ffffff"), opacity: businessLoading ? 0.6 : 1 }}>
+          <button type="button" onClick={exportPDF} disabled={businessLoading || !business} style={{ ...topButton("#f97316", "#ffffff"), opacity: businessLoading || !business ? 0.6 : 1 }}>
             {businessLoading ? "Loading Branding..." : "Export to PDF"}
           </button>
           <button type="button" onClick={createInvoice} style={topButton("#15803d", "#ffffff")}>Create Invoice</button>
@@ -818,12 +780,12 @@ function buildFileName() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
-            <img src={companyLogo} alt={`${companyName} logo`} crossOrigin="anonymous" onError={(event) => { if (event.currentTarget.src !== new URL(FALLBACK_COMPANY.logo, window.location.href).href) event.currentTarget.src = FALLBACK_COMPANY.logo; }} style={{ maxWidth: 165, maxHeight: 90, objectFit: "contain" }} />
+            {companyLogo && <img src={companyLogo} alt={`${companyName} logo`} crossOrigin="anonymous" onError={(event) => { event.currentTarget.style.display = "none"; }} style={{ maxWidth: 165, maxHeight: 90, objectFit: "contain" }} />}
             <div style={{ color: "#57534e", fontSize: 13, lineHeight: 1.6 }}>
               <strong style={{ color: "#1c1917", fontSize: 17 }}>{companyName}</strong>
-              <div>{companyTagline}</div>
-              <div>{companyPhone} · {companyEmail}</div>
-              <div>{companyWebsite}</div>
+              {companyTagline && <div>{companyTagline}</div>}
+              {(companyPhone || companyEmail) && <div>{[companyPhone, companyEmail].filter(Boolean).join(" · ")}</div>}
+              {companyWebsite && <div>{companyWebsite}</div>}
             </div>
           </div>
           <h1
