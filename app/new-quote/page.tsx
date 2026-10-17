@@ -63,6 +63,8 @@ export default function NewQuotePage() {
   const [projectAddress, setProjectAddress] = useState("");
   const [contactInfo, setContactInfo] = useState("");
   const [quoteNumber, setQuoteNumber] = useState("");
+  const [editingExistingQuote, setEditingExistingQuote] = useState(false);
+  const [savingQuote, setSavingQuote] = useState(false);
   const [quoteDate, setQuoteDate] = useState("");
   const [projectTotal, setProjectTotal] = useState("");
   const [startWindow, setStartWindow] = useState("");
@@ -81,6 +83,7 @@ useEffect(() => {
     const savedDraft = localStorage.getItem("quotesnapEditDraft");
 
     if (savedDraft) {
+      setEditingExistingQuote(true);
       const draft = JSON.parse(savedDraft);
 
       setQuoteId(draft.id || Date.now().toString());
@@ -118,33 +121,16 @@ useEffect(() => {
     return new Date().toISOString().slice(0, 10);
   }
 
-  async function generateQuoteNumber() {
-  const year = new Date().getFullYear();
-  const prefix = `IR-${year}-`;
-
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("quote_number")
-    .like("quote_number", `${prefix}%`);
-
-  if (error) {
-    console.error("Could not generate quote number:", error);
-    return `${prefix}001`;
+  // The database generates numbers within the signed-in user's workspace.
+  // A preview number is not reserved; the final number is confirmed on save.
+  async function generateQuoteNumber(): Promise<string> {
+    const { data, error } = await supabase.rpc("next_quote_number");
+    if (error || typeof data !== "string") {
+      console.error("Could not generate quote number:", error);
+      return "";
+    }
+    return data;
   }
-
-  const numbers = (data || [])
-    .map((q: any) => {
-      const value = String(q.quote_number || "");
-      const numberPart = value.replace(prefix, "");
-      return Number(numberPart);
-    })
-    .filter((n: number) => Number.isFinite(n));
-
-  const nextNumber =
-    numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-
-  return `${prefix}${String(nextNumber).padStart(3, "0")}`;
-}
 
   async function compressImage(file: File): Promise<string> {
     return new Promise((resolve) => {
@@ -211,88 +197,98 @@ useEffect(() => {
   }
 
   async function saveQuote() {
-  const quoteData = {
-    id: quoteId || Date.now().toString(),
-    clientName,
-    projectAddress,
-    contactInfo,
-    quoteNumber,
-    quoteDate,
-    projectTotal,
-    startWindow,
-    scopeOfWork,
-    bannerImage,
-    status: status || "Draft",
-    includePaymentTerms,
-    includeWeatherDisclaimer,
-    includeScopeDisclaimer,
-    includeDepositNote,
-    includeAcceptanceLanguage,
-  };
+    if (savingQuote) return;
+    setSavingQuote(true);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw new Error("You must be logged in to save a quote.");
 
-  // Keep this for the existing Preview page.
-  localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
+      const { data: membership, error: membershipError } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", userData.user.id)
+        .single();
+      if (membershipError || !membership) throw new Error("Could not find your QuoteSnap workspace.");
 
-  const { data: userData, error: userError } =
-    await supabase.auth.getUser();
-
-  if (userError || !userData.user) {
-    console.error("No logged-in user:", userError);
-    alert("You must be logged in to save a quote.");
-    return;
-  }
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", userData.user.id)
-    .single();
-
-  if (membershipError || !membership) {
-    console.error("Workspace lookup failed:", membershipError);
-    alert("Could not find your QuoteSnap workspace.");
-    return;
-  }
-
-  const { error: saveError } = await supabase
-    .from("quotes")
-    .upsert(
-      {
+      const id = quoteId || Date.now().toString();
+      const fields = {
         workspace_id: membership.workspace_id,
-        legacy_id: quoteData.id,
-        quote_number: quoteData.quoteNumber,
-        client_name: quoteData.clientName,
-        project_address: quoteData.projectAddress,
-        contact_info: quoteData.contactInfo,
-       
-       quote_date: quoteData.quoteDate,
-project_total: Number(
-  String(quoteData.projectTotal || "0").replace(/[$,\s]/g, "")
-),
+        legacy_id: id,
+        client_name: clientName,
+        project_address: projectAddress,
+        contact_info: contactInfo,
+        quote_date: quoteDate,
+        project_total: Number(String(projectTotal || "0").replace(/[$,\s]/g, "")),
+        start_window: startWindow,
+        scope_of_work: scopeOfWork,
+        banner_image_url: bannerImage,
+        status: status || "Draft",
+        include_payment_terms: includePaymentTerms,
+        include_weather_disclaimer: includeWeatherDisclaimer,
+        include_scope_disclaimer: includeScopeDisclaimer,
+        include_deposit_note: includeDepositNote,
+        include_acceptance_language: includeAcceptanceLanguage,
+      };
 
-        start_window: quoteData.startWindow,
-        scope_of_work: quoteData.scopeOfWork,
-        banner_image_url: quoteData.bannerImage,
-        status: quoteData.status,
-        include_payment_terms: quoteData.includePaymentTerms,
-        include_weather_disclaimer: quoteData.includeWeatherDisclaimer,
-        include_scope_disclaimer: quoteData.includeScopeDisclaimer,
-        include_deposit_note: quoteData.includeDepositNote,
-        include_acceptance_language: quoteData.includeAcceptanceLanguage,
-      },
-      { onConflict: "workspace_id,quote_number" }
-    );
+      let finalNumber = quoteNumber;
+      if (editingExistingQuote) {
+        // Edit the original record by its stable legacy ID, not by a quote-number conflict.
+        // If the original is missing, stop rather than silently create a duplicate.
+        const { data: existing, error: lookupError } = await supabase
+          .from("quotes")
+          .select("id, quote_number")
+          .eq("workspace_id", membership.workspace_id)
+          .eq("legacy_id", id)
+          .maybeSingle();
+        if (lookupError) throw new Error(lookupError.message);
+        if (!existing) throw new Error("Original quote not found. No changes were saved.");
+        finalNumber = existing.quote_number;
+        const { data: updated, error: updateError } = await supabase
+          .from("quotes")
+          .update(fields)
+          .eq("id", existing.id)
+          .eq("workspace_id", membership.workspace_id)
+          .select("id");
+        if (updateError) throw new Error(updateError.message);
+        if (!updated?.length) throw new Error("The original quote could not be updated.");
+      } else {
+        // A displayed draft number is only a preview. Generate again at insert time.
+        // Unique(workspace_id, quote_number) protects against concurrent saves.
+        let inserted = false;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data: nextNumber, error: numberError } = await supabase.rpc("next_quote_number");
+          if (numberError || typeof nextNumber !== "string") {
+            throw new Error(numberError?.message || "Could not generate a quote number.");
+          }
+          finalNumber = nextNumber;
+          const { error: insertError } = await supabase
+            .from("quotes")
+            .insert({ ...fields, quote_number: finalNumber });
+          if (!insertError) { inserted = true; break; }
+          // 23505 is a unique-constraint collision. Retry with a fresh number.
+          if (insertError.code !== "23505") throw new Error(insertError.message);
+        }
+        if (!inserted) throw new Error("Quote numbering is busy. Please try saving again.");
+      }
 
-  if (saveError) {
-    console.error("Error saving quote to Supabase:", saveError);
-    alert("Quote could not be saved: " + saveError.message);
-    return;
+      const quoteData = {
+        id, clientName, projectAddress, contactInfo, quoteNumber: finalNumber,
+        quoteDate, projectTotal, startWindow, scopeOfWork, bannerImage,
+        status: status || "Draft", includePaymentTerms, includeWeatherDisclaimer,
+        includeScopeDisclaimer, includeDepositNote, includeAcceptanceLanguage,
+      };
+      setQuoteNumber(finalNumber);
+      localStorage.setItem("quotesnapDraft", JSON.stringify(quoteData));
+      localStorage.removeItem("quotesnapEditDraft");
+      window.location.href = "/preview";
+    } catch (error) {
+      console.error("Quote save failed:", error);
+      alert("Quote could not be saved: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setSavingQuote(false);
+    }
   }
 
-  localStorage.removeItem("quotesnapEditDraft");
-  window.location.href = "/preview";
-}
-  
   function goHome() {
     window.location.href = "/";
   }
@@ -342,7 +338,7 @@ project_total: Number(
           <div style={twoColumn}>
             <div style={fieldGroup}>
               <label style={labelStyle}>Quote Number</label>
-              <input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} style={inputStyle} />
+              <input value={quoteNumber} readOnly placeholder="Assigned when saved" style={{ ...inputStyle, background: "#f5f5f4" }} />
             </div>
 
             <div style={fieldGroup}>
@@ -481,12 +477,13 @@ project_total: Number(
           <button
             type="button"
             onClick={saveQuote}
+            disabled={savingQuote}
             style={{
               ...primaryButton,
               marginTop: "26px",
             }}
           >
-            Preview Quote
+            {savingQuote ? "Saving Quote..." : "Preview Quote"}
           </button>
         </div>
       </div>
