@@ -64,6 +64,7 @@ export default function PreviewPage() {
   const [businessLoading, setBusinessLoading] = useState(true);
   const [businessError, setBusinessError] = useState("");
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   const companyName = business?.business_name?.trim() || business?.name?.trim() || "Business";
   const companyTagline = business?.tagline?.trim() || "";
@@ -646,61 +647,76 @@ function buildFileName() {
     window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
   async function createInvoice() {
-    const invoiceNumber = `INV-${Date.now()}`;
+    if (creatingInvoice) return;
+    setCreatingInvoice(true);
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw authError || new Error("Please sign in again.");
 
-    // The preview page is driven by the local draft, so first resolve that
-    // draft back to the real Supabase quote row. This gives the invoice the
-    // UUIDs required by the invoices table and its RLS policy.
-    const { data: savedQuote, error: quoteError } = await supabase
-      .from("quotes")
-      .select("id, workspace_id")
-      .eq("quote_number", quote.quoteNumber)
-      .single();
+      const { data: membership, error: membershipError } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", auth.user.id)
+        .limit(1)
+        .single();
+      if (membershipError || !membership) throw membershipError || new Error("Business workspace not found.");
 
-    if (quoteError || !savedQuote) {
-      console.error("Could not find saved quote:", quoteError);
-      alert("Could not find the saved quote in QuoteSnap.");
-      return;
-    }
+      // Match both the number and the current workspace, never another business's quote.
+      const { data: savedQuote, error: quoteError } = await supabase
+        .from("quotes")
+        .select("id, workspace_id")
+        .eq("workspace_id", membership.workspace_id)
+        .eq("quote_number", quote.quoteNumber)
+        .single();
+      if (quoteError || !savedQuote) throw quoteError || new Error("Could not find the saved quote.");
 
-    // projectTotal is the field used everywhere else on this preview page.
-    // Strip currency formatting before inserting into numeric DB columns.
-    const numericTotal =
-      typeof quote.projectTotal === "number"
-        ? quote.projectTotal
-        : Number(
-            String(quote.projectTotal || "0")
-              .replace(/[$,]/g, "")
-              .trim()
-          ) || 0;
+      const numericTotal =
+        typeof quote.projectTotal === "number"
+          ? quote.projectTotal
+          : Number(String(quote.projectTotal || "0").replace(/[$,]/g, "").trim()) || 0;
 
-    const { data, error } = await supabase
-      .from("invoices")
-      .insert({
-        workspace_id: savedQuote.workspace_id,
-        quote_id: savedQuote.id,
-        invoice_number: invoiceNumber,
-        client_name: quote.clientName || "",
-        project_address: quote.projectAddress || "",
-        contact_info: quote.contactInfo || "",
-        scope_of_work: quote.scopeOfWork || "",
-        subtotal: numericTotal,
-        adjustments: 0,
-        total: numericTotal,
-        amount_paid: 0,
-        status: "Draft",
-        invoice_date: new Date().toISOString().split("T")[0],
-      })
-      .select()
-      .single();
+      // The database generates the next invoice number for this signed-in workspace.
+      // A unique workspace/number constraint protects concurrent inserts.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data: invoiceNumber, error: numberError } = await supabase.rpc("next_invoice_number");
+        if (numberError || typeof invoiceNumber !== "string" || !invoiceNumber) {
+          throw numberError || new Error("Could not generate an invoice number.");
+        }
 
-    if (error) {
+        const { data, error } = await supabase
+          .from("invoices")
+          .insert({
+            workspace_id: savedQuote.workspace_id,
+            quote_id: savedQuote.id,
+            invoice_number: invoiceNumber,
+            client_name: quote.clientName || "",
+            project_address: quote.projectAddress || "",
+            contact_info: quote.contactInfo || "",
+            scope_of_work: quote.scopeOfWork || "",
+            subtotal: numericTotal,
+            adjustments: 0,
+            total: numericTotal,
+            amount_paid: 0,
+            status: "Draft",
+            invoice_date: new Date().toISOString().split("T")[0],
+          })
+          .select("id")
+          .single();
+
+        if (!error && data) {
+          window.location.href = `/invoices?id=${data.id}`;
+          return;
+        }
+        // PostgreSQL 23505: another request took the number; fetch the next one.
+        if (error?.code === "23505" && attempt < 4) continue;
+        throw error || new Error("Invoice could not be saved.");
+      }
+    } catch (error) {
       console.error("Failed to create invoice:", error);
-      alert(`Could not create invoice: ${error.message}`);
-      return;
+      alert(`Could not create invoice: ${error instanceof Error ? error.message : "Please try again."}`);
+    } finally {
+      setCreatingInvoice(false);
     }
-
-    window.location.href = `/invoices?id=${data.id}`;
   }
   function goHome() {
     window.location.href = "/dashboard";
@@ -728,7 +744,7 @@ function buildFileName() {
           <button type="button" onClick={exportPDF} disabled={businessLoading || !business} style={{ ...topButton("#f97316", "#ffffff"), opacity: businessLoading || !business ? 0.6 : 1 }}>
             {businessLoading ? "Loading Branding..." : "Export to PDF"}
           </button>
-          <button type="button" onClick={createInvoice} style={topButton("#15803d", "#ffffff")}>Create Invoice</button>
+          <button type="button" onClick={createInvoice} disabled={creatingInvoice} style={{ ...topButton("#15803d", "#ffffff"), opacity: creatingInvoice ? 0.6 : 1 }}>{creatingInvoice ? "Creating Invoice..." : "Create Invoice"}</button>
           <button type="button" onClick={() => setMoreActionsOpen((open) => !open)} aria-expanded={moreActionsOpen} aria-controls="preview-more-actions" style={topButton("#f5f5f4", "#292524", "#d6d3d1")}>
             More Actions {moreActionsOpen ? "▴" : "▾"}
           </button>
