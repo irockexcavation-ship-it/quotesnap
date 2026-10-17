@@ -29,12 +29,13 @@ type BusinessProfile = {
   logo_path: string | null;
 };
 
+// Neutral defaults only: never display another business's information.
 const FALLBACK_BUSINESS = {
-  name: "iRock Excavation & Hauling",
-  tagline: "Rock Solid Driveway Systems",
-  phone: "(502) 552-9462",
-  email: "irockexcavation@gmail.com",
-  website: "iRockX.com",
+  name: "Business profile unavailable",
+  tagline: "",
+  phone: "",
+  email: "",
+  website: "",
   address: "",
 };
 
@@ -132,7 +133,8 @@ export default function InvoicesPage() {
     if (data.workspace_id) {
       await loadBusinessProfile(data.workspace_id);
     } else {
-      setBusinessError("Invoice has no workspace association. Using fallback business information.");
+      setBusiness(null);
+      setBusinessError("Invoice has no workspace association. Business details cannot be displayed.");
     }
   }
 
@@ -146,7 +148,7 @@ export default function InvoicesPage() {
       .single();
     if (error || !data) {
       console.error("Could not load invoice business profile:", error);
-      setBusinessError("Business profile unavailable. Invoice will use fallback company details.");
+      setBusinessError("Business profile unavailable. Please check your business Settings before sending this invoice.");
       setBusiness(null);
     } else {
       setBusiness(data);
@@ -327,7 +329,7 @@ export default function InvoicesPage() {
   }
 
   function sendInvoiceText() {
-    if (!selectedInvoice) return;
+    if (!selectedInvoice || businessLoading || !business) return;
 
     const total = Number(selectedInvoice.total || 0);
     const paid = Number(selectedInvoice.amount_paid || 0);
@@ -339,7 +341,7 @@ export default function InvoicesPage() {
       "Hi " + client + ", here is " + invoiceNumber +
       " from " + companyName + ". Balance due: " +
       money(balance) +
-      ". I can provide the invoice PDF separately. Thank you! - Kenny";
+      ". I can provide the invoice PDF separately. Thank you!";
 
     window.location.href = "sms:?&body=" + encodeURIComponent(message);
   }
@@ -479,7 +481,7 @@ export default function InvoicesPage() {
               <button onClick={exportInvoicePDF} disabled={exportingPDF || businessLoading} style={{ ...greenButton, opacity: exportingPDF || businessLoading ? 0.6 : 1 }}>
                 {exportingPDF ? "Exporting..." : businessLoading ? "Loading branding..." : "Export Invoice PDF"}
               </button>
-              <button onClick={sendInvoiceText} style={greenButton}>
+              <button onClick={sendInvoiceText} disabled={businessLoading || !business} style={{ ...greenButton, opacity: businessLoading || !business ? 0.6 : 1 }}>
                 Send Invoice Text
               </button>
               <button onClick={backToInvoices} style={blackButton}>
