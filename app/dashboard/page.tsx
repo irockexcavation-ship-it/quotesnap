@@ -613,7 +613,7 @@ function Action({
       <div
         style={{
           fontSize: "24px",
-          color: accent,
+          color: "#f97316",
           marginBottom: "7px",
         }}
       >
